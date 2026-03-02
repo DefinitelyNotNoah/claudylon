@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Vite
+.vite/
+
+# Babylon Editor (no longer used)
+.bjseditor/
+project.bjseditor
+assets/.export-cache.json
+assets/*.material
+assets/*.env
+assets/example.scene/
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# IDE
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+
+# TypeScript
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Python bytecode (for scripts/)
+__pycache__/
+*.pyc
