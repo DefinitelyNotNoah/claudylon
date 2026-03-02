@@ -39,3 +39,6 @@ npm-debug.log*
 # Python bytecode (for scripts/)
 __pycache__/
 *.pyc
+
+# FBX source files (too large, not used at runtime)
+*.fbx
