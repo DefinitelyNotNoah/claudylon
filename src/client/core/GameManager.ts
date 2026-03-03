@@ -9,6 +9,7 @@ import { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
 import HavokPhysics from "@babylonjs/havok";
 
 import type { GameScene } from "./GameScene";
+import { ImGuiManager } from "../ui/ImGuiManager";
 
 /** localStorage key for the WebGPU toggle (matches GraphicsSettings prefix + key). */
 const GFX_WEBGPU_KEY = "fps_gfx_useWebGPU";
@@ -24,6 +25,7 @@ export class GameManager {
     private _engine: Engine;
     private _havokInstance: unknown;
     private _activeScene: GameScene | null = null;
+    private _imguiManager: ImGuiManager;
 
     /**
      * Private constructor — use `GameManager.initialize()` instead.
@@ -31,10 +33,11 @@ export class GameManager {
      * @param engine - The Babylon.js engine instance.
      * @param havokInstance - The initialized Havok WASM instance.
      */
-    private constructor(canvas: HTMLCanvasElement, engine: Engine, havokInstance: unknown) {
+    private constructor(canvas: HTMLCanvasElement, engine: Engine, havokInstance: unknown, imguiManager: ImGuiManager) {
         this._canvas = canvas;
         this._engine = engine;
         this._havokInstance = havokInstance;
+        this._imguiManager = imguiManager;
     }
 
     /**
@@ -81,7 +84,11 @@ export class GameManager {
 
         const havokInstance = await HavokPhysics();
 
-        const manager = new GameManager(canvas, engine, havokInstance);
+        // Initialize Dear ImGui overlay
+        const imguiManager = ImGuiManager.getInstance();
+        await imguiManager.initialize(canvas);
+
+        const manager = new GameManager(canvas, engine, havokInstance, imguiManager);
         GameManager._instance = manager;
 
         window.addEventListener("resize", () => {
@@ -90,6 +97,7 @@ export class GameManager {
 
         engine.runRenderLoop(() => {
             manager._activeScene?.scene.render();
+            imguiManager.render();
         });
 
         return manager;
@@ -127,6 +135,11 @@ export class GameManager {
         return this._activeScene;
     }
 
+    /** The Dear ImGui overlay manager. */
+    public get imguiManager(): ImGuiManager {
+        return this._imguiManager;
+    }
+
     /**
      * Transitions to a new scene. Disposes the current scene if one exists.
      * @param SceneClass - The GameScene subclass to instantiate and initialize.
@@ -136,6 +149,10 @@ export class GameManager {
             this._activeScene.dispose();
             this._activeScene = null;
         }
+
+        // Reset ImGui state between scenes — hide overlay and clear scene-specific callback
+        this._imguiManager.hide();
+        this._imguiManager.setDrawCallback(null);
 
         const newScene = new SceneClass(this);
         await newScene.initialize();
@@ -148,6 +165,7 @@ export class GameManager {
     public dispose(): void {
         this._activeScene?.dispose();
         this._activeScene = null;
+        this._imguiManager.dispose();
         this._engine.dispose();
     }
 }

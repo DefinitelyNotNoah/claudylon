@@ -45,8 +45,8 @@ export class InputManager {
         this._mouseSensitivity = stored ? parseFloat(stored) : DEFAULT_MOUSE_SENSITIVITY;
 
         this._onKeyDown = (e: KeyboardEvent) => {
-            // When console is open, only allow Backquote through for toggle
-            if (this._inputSuppressed && e.code !== "Backquote") return;
+            // When console/ImGui is consuming input, only allow Backquote and L through
+            if (this._inputSuppressed && e.code !== "Backquote" && e.code !== "KeyL") return;
 
             if (e.code === "Space" || e.code === "Tab") {
                 e.preventDefault();
@@ -238,6 +238,15 @@ export class InputManager {
         const pressed = this._keysJustPressed.get("Backquote") ?? false;
         if (pressed) {
             this._keysJustPressed.set("Backquote", false);
+        }
+        return pressed;
+    }
+
+    /** True only on the frame L is first pressed (one-shot). */
+    public get toggleImGui(): boolean {
+        const pressed = this._keysJustPressed.get("KeyL") ?? false;
+        if (pressed) {
+            this._keysJustPressed.set("KeyL", false);
         }
         return pressed;
     }

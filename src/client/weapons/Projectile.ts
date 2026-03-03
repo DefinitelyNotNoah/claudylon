@@ -33,8 +33,13 @@ export interface ProjectileHitInfo {
     hitMesh: AbstractMesh | null;
 }
 
-/** Maximum lifetime for a projectile in seconds. */
-const PROJECTILE_LIFETIME = 3.0;
+/** Maximum lifetime for a projectile in seconds. Exported for ImGui tuning. */
+export let PROJECTILE_LIFETIME = 3.0;
+
+/** Sets the projectile lifetime. Needed because ES module `let` exports are read-only to importers. */
+export function setProjectileLifetime(v: number): void {
+    PROJECTILE_LIFETIME = v;
+}
 
 /** Shared material for all projectiles (created once per scene). */
 let _sharedMaterial: StandardMaterial | null = null;

@@ -88,7 +88,17 @@
       "Read(//e/SteamLibrary/steamapps/common//**)",
       "Bash(\"/d/Steam Games/steamapps/common/Blender/blender.exe\" -b -P \"c:/Users/Noah/Desktop/fps_project/scripts/convert_fbx_to_glb.py\")",
       "WebFetch(domain:codepen.io)",
-      "WebFetch(domain:flyover.github.io)"
+      "WebFetch(domain:flyover.github.io)",
+      "WebFetch(domain:mori2003.github.io)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:jsr.io)",
+      "Bash(npm install @mori2003/jsimgui)",
+      "Bash(ls src/client/*/ -d)",
+      "Bash(ls .prettierrc* .eslintrc* eslint.config* biome*)",
+      "Bash(find src -name \"*.ts\" -exec wc -l {} +)",
+      "Skill(code-review:code-review)",
+      "Skill(code-review:code-review:*)",
+      "Bash(where gh)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Noah\\.claude\\projects\\c--Users-Noah-Desktop-fps-project"

@@ -141,6 +141,17 @@ export class ProgressionManager {
     }
 
     /**
+     * Directly sets the player's level (debug/ImGui use).
+     * Resets XP within the level to 0 and saves immediately.
+     * @param level - Target level (clamped to 1..MAX_LEVEL).
+     */
+    public setLevel(level: number): void {
+        this._level = Math.max(1, Math.min(MAX_LEVEL, Math.floor(level)));
+        this._xp = 0;
+        this._save();
+    }
+
+    /**
      * Checks whether a weapon is unlocked at the current level.
      * @param weaponId - The weapon to check.
      * @returns True if the weapon is unlocked.

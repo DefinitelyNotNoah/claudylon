@@ -62,6 +62,7 @@ import { MATCH_DURATION_S, SHIPMENT_SPAWN_POINTS } from "../../shared/constants/
 import {
     BOT_COUNT_KEY,
     BOT_DIFFICULTY_KEY,
+    BOT_DIFFICULTIES,
     DEFAULT_BOT_COUNT,
     DEFAULT_BOT_DIFFICULTY,
     ENTITY_CULL_DISTANCE,
@@ -72,6 +73,24 @@ import { ConsoleCommandRegistry } from "../core/ConsoleCommandRegistry";
 import { DeveloperConsoleUI } from "../ui/DeveloperConsoleUI";
 import { WEAPON_STATS } from "../../shared/constants";
 import { PhysicsViewer } from "@babylonjs/core/Debug/physicsViewer";
+import { ImGui } from "@mori2003/jsimgui";
+import { drawPlayerTab } from "../ui/imgui/PlayerPanel";
+import { drawBotTab } from "../ui/imgui/BotPanel";
+import { drawWeaponsTab } from "../ui/imgui/WeaponsTab";
+import { drawAudioTab } from "../ui/imgui/AudioTab";
+import { drawGraphicsTab } from "../ui/imgui/GraphicsTab";
+import { drawPhysicsTab } from "../ui/imgui/PhysicsTab";
+import { drawProgressionTab } from "../ui/imgui/ProgressionTab";
+import { drawPerformanceTab } from "../ui/imgui/PerformanceTab";
+import type { PlayerPanelContext } from "../ui/imgui/PlayerPanel";
+import type { BotPanelContext, BotInfo } from "../ui/imgui/BotPanel";
+import type { WeaponsTabContext } from "../ui/imgui/WeaponsTab";
+import type { AudioTabContext } from "../ui/imgui/AudioTab";
+import type { PhysicsTabContext } from "../ui/imgui/PhysicsTab";
+import type { ProgressionTabContext } from "../ui/imgui/ProgressionTab";
+import type { PerformanceTabContext } from "../ui/imgui/PerformanceTab";
+import { PROJECTILE_LIFETIME, setProjectileLifetime } from "../weapons/Projectile";
+import { WEAPON_UNLOCK_REQUIREMENTS } from "../../shared/constants/WeaponConstants";
 
 /** Gravity vector: 981 cm/s² downward. */
 const GRAVITY = new Vector3(0, -981, 0);
@@ -338,6 +357,42 @@ export class MatchScene extends GameScene {
             network.triggerExistingPlayers();
         }
 
+        // ─── ImGui Panel Registration ──────────────────────────────
+        this._manager.imguiManager.setDrawCallback(() => {
+            if (this._playerController && ImGui.BeginTabItem("Player")) {
+                drawPlayerTab(this._buildPlayerPanelContext());
+                ImGui.EndTabItem();
+            }
+            if (this._botManager && ImGui.BeginTabItem("Bots")) {
+                drawBotTab(this._buildBotPanelContext());
+                ImGui.EndTabItem();
+            }
+            if (this._weaponManager && ImGui.BeginTabItem("Weapons")) {
+                drawWeaponsTab(this._buildWeaponsTabContext());
+                ImGui.EndTabItem();
+            }
+            if (this._audioManager && ImGui.BeginTabItem("Audio")) {
+                drawAudioTab(this._buildAudioTabContext());
+                ImGui.EndTabItem();
+            }
+            if (ImGui.BeginTabItem("Graphics")) {
+                drawGraphicsTab();
+                ImGui.EndTabItem();
+            }
+            if (this._playerController && ImGui.BeginTabItem("Physics")) {
+                drawPhysicsTab(this._buildPhysicsTabContext());
+                ImGui.EndTabItem();
+            }
+            if (ImGui.BeginTabItem("Progression")) {
+                drawProgressionTab(this._buildProgressionTabContext());
+                ImGui.EndTabItem();
+            }
+            if (ImGui.BeginTabItem("Performance")) {
+                drawPerformanceTab(this._buildPerformanceTabContext());
+                ImGui.EndTabItem();
+            }
+        });
+
         // ─── Weapon Drop System ──────────────────────────────────
         this._weaponDropManager = new WeaponDropManager(this._scene);
         this._weaponDropManager.onSameWeaponPickup = (weaponId) => {
@@ -383,15 +438,23 @@ export class MatchScene extends GameScene {
         };
         this._consoleUI.onHide = () => {
             if (this._inputManager) {
-                this._inputManager.inputSuppressed = false;
-                this._inputManager.pointerLockEnabled = true;
-            }
-            try {
-                const p = this._manager.canvas.requestPointerLock() as unknown;
-                if (p instanceof Promise) {
-                    (p as Promise<void>).catch(() => {});
+                // Only unsuppress if ImGui isn't also open
+                const imguiOpen = this._manager.imguiManager.isVisible;
+                if (!imguiOpen) {
+                    this._inputManager.inputSuppressed = false;
                 }
-            } catch (_) { /* ignore */ }
+                if (!imguiOpen && !this._isPaused) {
+                    this._inputManager.pointerLockEnabled = true;
+                }
+            }
+            if (!this._manager.imguiManager.isVisible && !this._isPaused) {
+                try {
+                    const p = this._manager.canvas.requestPointerLock() as unknown;
+                    if (p instanceof Promise) {
+                        (p as Promise<void>).catch(() => {});
+                    }
+                } catch (_) { /* ignore */ }
+            }
         };
 
         /*
@@ -433,6 +496,26 @@ export class MatchScene extends GameScene {
                     this._consoleUI.hide();
                 } else {
                     this._consoleUI?.show();
+                }
+            }
+
+            // ImGui toggle — works even when input is suppressed
+            const imgui = this._manager.imguiManager;
+            if (this._inputManager?.toggleImGui) {
+                imgui.toggle();
+                // Immediately disable/enable pointer lock on toggle so clicks
+                // over ImGui windows don't trigger requestPointerLock().
+                if (imgui.isVisible) {
+                    this._inputManager.inputSuppressed = true;
+                    this._inputManager.pointerLockEnabled = false;
+                    document.exitPointerLock();
+                } else if (!this._isPaused) {
+                    // Only unsuppress if the console isn't also open
+                    const consoleOpen = this._consoleUI?.isVisible ?? false;
+                    if (!consoleOpen) {
+                        this._inputManager.inputSuppressed = false;
+                    }
+                    this._inputManager.pointerLockEnabled = true;
                 }
             }
 
@@ -1752,11 +1835,37 @@ export class MatchScene extends GameScene {
                 let count = 0;
                 for (const bot of this._botManager.bots) {
                     if (bot.isDead) {
-                        bot.takeDamage(0); // triggers respawn timer check
+                        bot.forceRespawn();
                         count++;
                     }
                 }
                 return count > 0 ? `${count} bot(s) will respawn shortly` : "No dead bots";
+            },
+        });
+
+        reg.register({
+            name: "cl_bot_remove",
+            description: "Remove a specific bot by name, or the last bot if no name given",
+            usage: "cl_bot_remove [name]",
+            params: [{ name: "name", type: "string", optional: true }],
+            execute: (args) => {
+                if (!this._botManager) return "No bots active";
+                const bots = this._botManager.bots;
+                if (bots.length === 0) return "No bots to remove";
+
+                let targetSessionId: string | null = null;
+                if (args[0]) {
+                    const target = bots.find(
+                        b => b.displayName.toLowerCase() === args[0].toLowerCase()
+                    );
+                    if (!target) return `No bot named "${args[0]}"`;
+                    targetSessionId = target.sessionId;
+                } else {
+                    targetSessionId = bots[bots.length - 1].sessionId;
+                }
+
+                const name = this._botManager.removeBot(targetSessionId);
+                return name ? `Removed bot "${name}"` : "Failed to remove bot";
             },
         });
 
@@ -2496,10 +2605,291 @@ export class MatchScene extends GameScene {
         this._crosshairHUD.updateHealth(this._playerController.currentHealth);
     }
 
+    // ─── ImGui Panel Context Builders ────────────────────────────
+
+    /**
+     * Builds the context object for the Player ImGui panel.
+     * Uses closures referencing private MatchScene fields.
+     */
+    private _buildPlayerPanelContext(): PlayerPanelContext {
+        return {
+            getHealth: () => this._playerController?.currentHealth ?? 0,
+            setHealth: (v) => {
+                this._playerController?.setHealth(v);
+                this._crosshairHUD?.updateHealth(this._playerController?.currentHealth ?? 0);
+            },
+            getPosition: () => {
+                const p = this._playerController?.position;
+                return p ? { x: p.x, y: p.y, z: p.z } : { x: 0, y: 0, z: 0 };
+            },
+            teleport: (x, y, z) => {
+                this._playerController?.teleport(new Vector3(x, y, z));
+            },
+            getSpeed: () => PLAYER_STATS.movementSpeed,
+            setSpeed: (v) => { PLAYER_STATS.movementSpeed = v; },
+            getJumpHeight: () => PLAYER_STATS.jumpHeight,
+            setJumpHeight: (v) => { PLAYER_STATS.jumpHeight = v; },
+            getGodMode: () => this._godMode,
+            setGodMode: (v) => { this._godMode = v; },
+            getNoclip: () => this._playerController?.isNoclip ?? false,
+            toggleNoclip: () => { this._playerController?.toggleNoclip(); },
+            getInfiniteAmmo: () => this._infiniteAmmo,
+            setInfiniteAmmo: (v) => { this._infiniteAmmo = v; },
+            getFov: () => {
+                const cam = this._playerController?.camera;
+                return cam ? cam.fov * 180 / Math.PI : 70;
+            },
+            setFov: (v) => {
+                if (this._playerController) {
+                    this._playerController.camera.fov = v * Math.PI / 180;
+                }
+            },
+            kill: () => { this._consoleRegistry?.execute("cl_kill"); },
+            respawn: () => { this._consoleRegistry?.execute("cl_respawn"); },
+        };
+    }
+
+    /**
+     * Builds the context object for the Bots ImGui panel.
+     * Uses closures referencing private MatchScene fields.
+     */
+    private _buildBotPanelContext(): BotPanelContext {
+        const bm = this._botManager!;
+        const diffKey = localStorage.getItem("fps_bot_difficulty") || DEFAULT_BOT_DIFFICULTY;
+        const diff = BOT_DIFFICULTIES[diffKey] ?? BOT_DIFFICULTIES["medium"];
+        const allIds = Object.keys(WEAPON_STATS);
+        const allNames = allIds.map(id => WEAPON_STATS[id as WeaponId].name);
+
+        return {
+            getBotCount: () => bm.bots.length,
+            getBotInfos: () => {
+                const infos: BotInfo[] = [];
+                for (const bot of bm.bots) {
+                    const pos = bot.position;
+                    const weaponName = WEAPON_STATS[bot.weaponId]?.name ?? bot.weaponId;
+                    infos.push({
+                        sessionId: bot.sessionId,
+                        name: bot.displayName,
+                        health: bot.health,
+                        state: bot.isDead ? "Dead" : bot.state,
+                        weapon: weaponName,
+                        weaponId: bot.weaponId,
+                        x: pos.x,
+                        y: pos.y,
+                        z: pos.z,
+                        isDead: bot.isDead,
+                        isFrozen: bot.manualFrozen,
+                        kills: bot.kills,
+                        deaths: bot.deaths,
+                    });
+                }
+                return infos;
+            },
+            setBotHealth: (v) => {
+                for (const bot of bm.bots) {
+                    if (!bot.isDead) bot.setHealth(v);
+                }
+            },
+            killAllBots: () => { this._consoleRegistry?.execute("cl_bot_kill"); },
+            respawnBots: () => { this._consoleRegistry?.execute("cl_bot_respawn"); },
+            isFrozen: () => bm.manualFreezeAll,
+            toggleFreeze: () => { bm.toggleFreezeAll(); },
+            isRagdolled: () => bm.ragdollFreezeAll,
+            toggleRagdoll: () => { this._consoleRegistry?.execute("cl_bot_ragdoll"); },
+            addBot: () => { bm.addBot(); },
+            removeBot: (sessionId) => { bm.removeBot(sessionId); },
+            removeLastBot: () => {
+                const bots = bm.bots;
+                if (bots.length > 0) bm.removeBot(bots[bots.length - 1].sessionId);
+            },
+            getAimAccuracy: () => diff.aimAccuracy,
+            setAimAccuracy: (v) => { diff.aimAccuracy = v; },
+            getReactionTime: () => diff.reactionTimeMs,
+            setReactionTime: (v) => { diff.reactionTimeMs = v; },
+            getFieldOfView: () => diff.fieldOfView,
+            setFieldOfView: (v) => { diff.fieldOfView = v; },
+            getEngageRange: () => diff.engageRange,
+            setEngageRange: (v) => { diff.engageRange = v; },
+            getFireInterval: () => diff.fireIntervalMs,
+            setFireInterval: (v) => { diff.fireIntervalMs = v; },
+            // Per-bot actions
+            setBotIndividualHealth: (sessionId, v) => {
+                const bot = bm.bots.find(b => b.sessionId === sessionId);
+                if (bot && !bot.isDead) bot.setHealth(v);
+            },
+            killBot: (sessionId) => {
+                const bot = bm.bots.find(b => b.sessionId === sessionId);
+                if (bot && !bot.isDead) bot.takeDamage(9999);
+            },
+            respawnBot: (sessionId) => {
+                const bot = bm.bots.find(b => b.sessionId === sessionId);
+                if (bot && bot.isDead) bot.forceRespawn();
+            },
+            freezeBot: (sessionId, manualFrozen) => {
+                const bot = bm.bots.find(b => b.sessionId === sessionId);
+                if (bot) bot.manualFrozen = manualFrozen;
+            },
+            teleportBot: (sessionId, x, y, z) => {
+                const bot = bm.bots.find(b => b.sessionId === sessionId);
+                if (bot) bot.teleport(x, y, z);
+            },
+            setBotWeapon: (sessionId, weaponId) => {
+                const bot = bm.bots.find(b => b.sessionId === sessionId);
+                if (bot) bot.setWeapon(weaponId as WeaponId);
+            },
+            allWeaponIds: allIds,
+            allWeaponNames: allNames,
+        };
+    }
+
+    /**
+     * Builds context for the Weapons ImGui tab.
+     */
+    private _buildWeaponsTabContext(): WeaponsTabContext {
+        const wm = this._weaponManager!;
+        const sway = this._weaponSway;
+        const allIds = Object.keys(WEAPON_STATS);
+        const allNames = allIds.map(id => WEAPON_STATS[id as WeaponId].name);
+        return {
+            getActiveWeaponName: () => wm.activeWeapon.name,
+            getActiveWeaponId: () => wm.activeWeapon.id,
+            getActiveSlot: () => wm.activeSlot,
+            getSlot1Id: () => wm.slot1WeaponId,
+            getSlot2Id: () => wm.slot2WeaponId,
+            getCurrentAmmo: () => wm.activeWeapon.currentAmmo,
+            getReserveAmmo: () => wm.activeWeapon.reserveAmmo,
+            getIsReloading: () => wm.activeWeapon.isReloading,
+            getDamage: () => wm.activeWeapon.stats.damage,
+            setDamage: (v) => { wm.activeWeapon.stats.damage = v; },
+            getFireRate: () => wm.activeWeapon.stats.fireRate,
+            setFireRate: (v) => { wm.activeWeapon.stats.fireRate = v; },
+            getProjectileSpeed: () => wm.activeWeapon.stats.projectileSpeed,
+            setProjectileSpeed: (v) => { wm.activeWeapon.stats.projectileSpeed = v; },
+            getMagSize: () => wm.activeWeapon.stats.magazineSize,
+            setMagSize: (v) => { wm.activeWeapon.stats.magazineSize = v; },
+            getReloadTime: () => wm.activeWeapon.stats.reloadTime,
+            setReloadTime: (v) => { wm.activeWeapon.stats.reloadTime = v; },
+            refillAmmo: () => { wm.refillAllAmmo(); },
+            switchWeapon: (id) => { wm.replaceActiveWeapon(id as WeaponId); },
+            getIdleSwayX: () => sway?.idleSwayX ?? 0.06,
+            setIdleSwayX: (v) => { if (sway) sway.idleSwayX = v; },
+            getIdleSwayY: () => sway?.idleSwayY ?? 0.04,
+            setIdleSwayY: (v) => { if (sway) sway.idleSwayY = v; },
+            getWalkSwingX: () => sway?.walkSwingX ?? 0.45,
+            setWalkSwingX: (v) => { if (sway) sway.walkSwingX = v; },
+            getWalkBobY: () => sway?.walkBobY ?? 0.15,
+            setWalkBobY: (v) => { if (sway) sway.walkBobY = v; },
+            getRecoilKickZ: () => sway?.recoilKickZ ?? -1.5,
+            setRecoilKickZ: (v) => { if (sway) sway.recoilKickZ = v; },
+            getRecoilKickY: () => sway?.recoilKickY ?? 0.8,
+            setRecoilKickY: (v) => { if (sway) sway.recoilKickY = v; },
+            getRecoilRecovery: () => sway?.recoilRecoverySpeed ?? 12.0,
+            setRecoilRecovery: (v) => { if (sway) sway.recoilRecoverySpeed = v; },
+            allWeaponIds: allIds,
+            allWeaponNames: allNames,
+        };
+    }
+
+    /**
+     * Builds context for the Audio ImGui tab.
+     */
+    private _buildAudioTabContext(): AudioTabContext {
+        const am = this._audioManager!;
+        return {
+            getMasterVolume: () => am.getMasterVolume(),
+            setMasterVolume: (v) => { am.setMasterVolume(v); },
+            isFootstepPlaying: () => am.isFootstepPlaying,
+            isWindPlaying: () => am.isSoundPlaying("ambient_wind.mp3"),
+        };
+    }
+
+    /**
+     * Builds context for the Physics ImGui tab.
+     */
+    private _buildPhysicsTabContext(): PhysicsTabContext {
+        const pc = this._playerController!;
+        return {
+            getSpeed: () => PLAYER_STATS.movementSpeed,
+            setSpeed: (v) => { PLAYER_STATS.movementSpeed = v; },
+            getJumpHeight: () => PLAYER_STATS.jumpHeight,
+            setJumpHeight: (v) => { PLAYER_STATS.jumpHeight = v; },
+            getCapsuleHeight: () => PLAYER_STATS.capsuleHeight,
+            getCapsuleRadius: () => PLAYER_STATS.capsuleRadius,
+            isNoclip: () => pc.isNoclip,
+            toggleNoclip: () => { pc.toggleNoclip(); },
+            getProjectileLifetime: () => PROJECTILE_LIFETIME,
+            setProjectileLifetime: (v) => {
+                setProjectileLifetime(v);
+            },
+            getActiveProjectileCount: () => this._weaponManager?.activeProjectileCount ?? 0,
+            getVerticalVelocity: () => pc.verticalVelocity,
+            getPlayerState: () => pc.state,
+        };
+    }
+
+    /**
+     * Builds context for the Progression ImGui tab.
+     */
+    private _buildProgressionTabContext(): ProgressionTabContext {
+        const pm = ProgressionManager.getInstance();
+        return {
+            getLevel: () => pm.currentLevel,
+            setLevel: (v) => {
+                pm.setLevel(v);
+                this._xpBarUI?.onXPGained(true);
+            },
+            getXP: () => pm.currentXP,
+            getXPForLevel: () => pm.xpForCurrentLevel,
+            getXPProgress: () => pm.xpProgressInLevel,
+            addXP: (amount) => {
+                const result = pm.addXP(amount);
+                this._xpBarUI?.onXPGained(result.leveledUp);
+                if (result.leveledUp) {
+                    this._levelUpUI?.show(result.newLevel, result.unlockedWeapons);
+                }
+            },
+            unlockAll: () => {
+                pm.setLevel(30);
+                this._xpBarUI?.onXPGained(true);
+            },
+            getUnlockedWeapons: () => pm.getUnlockedWeapons(pm.currentLevel),
+            getAllWeaponUnlocks: () => {
+                return WEAPON_UNLOCK_REQUIREMENTS.map(req => ({
+                    name: WEAPON_STATS[req.weaponId]?.name ?? req.weaponId,
+                    level: req.unlockLevel,
+                    unlocked: pm.isWeaponUnlocked(req.weaponId),
+                }));
+            },
+        };
+    }
+
+    /**
+     * Builds context for the Performance ImGui tab.
+     */
+    private _buildPerformanceTabContext(): PerformanceTabContext {
+        const engine = this._manager.engine;
+        const scene = this._scene;
+        return {
+            getFPS: () => engine.getFps(),
+            getFrameTimeMs: () => engine.getDeltaTime(),
+            getDrawCalls: () => (engine as unknown as { _drawCalls: { current: number } })._drawCalls?.current ?? 0,
+            getActiveMeshes: () => scene.getActiveMeshes().length,
+            getActiveParticles: () => scene.getActiveParticles(),
+            getTotalVertices: () => scene.getTotalVertices(),
+            getTotalFaces: () => scene.getActiveMeshes().data.reduce(
+                (sum, m) => sum + ((m as AbstractMesh).getTotalIndices?.() ?? 0) / 3, 0,
+            ),
+            getResolution: () => `${engine.getRenderWidth()} x ${engine.getRenderHeight()}`,
+        };
+    }
+
     /**
      * Disposes all scene resources including player, weapon, HUD, input, and networking.
      */
     public override dispose(): void {
+        // Clear ImGui draw callback so panels don't reference disposed objects
+        this._manager.imguiManager.setDrawCallback(null);
+
         if (this._onPointerLockChange) {
             document.removeEventListener("pointerlockchange", this._onPointerLockChange);
         }

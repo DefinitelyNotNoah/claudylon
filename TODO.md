@@ -164,3 +164,71 @@
 - [x] Anti-aliasing pipeline (MSAA + FXAA + bloom + sharpen + tone mapping via DefaultRenderingPipeline)
 - [x] Master volume control (slider in main menu + pause menu, localStorage persistence)
 - [x] Final asset audit — confirm all manifest items are present
+
+## ImGui Debug Panel System
+> Dear ImGui overlay for real-time debugging and value tuning.
+> Toggle: L key (works in all scenes, even when input is suppressed).
+> Package: `@mori2003/jsimgui` v0.13.0. Architecture: separate WebGL2 canvas overlay with `pointer-events: none`, document-level input listeners.
+> Files: `src/client/ui/ImGuiManager.ts` (singleton), `src/client/ui/imgui/` (tab modules).
+> All tabs live inside a single "Debug Panel" window with a tab bar.
+
+### Phase 1 — Core Panels (DONE)
+- [x] Install `@mori2003/jsimgui` and initialize ImGuiManager singleton
+- [x] Hook into GameManager render loop (`engine.onEndFrameObservable`)
+- [x] L key toggle in InputManager (allowed through input suppression)
+- [x] Overlay canvas with `pointer-events: none` + document-level mouse/keyboard listeners
+- [x] High-DPI scaling via CSS transform trick (physical pixels + `scale(1/dpr)`)
+- [x] Pointer lock disable when ImGui visible, restore when hidden
+- [x] **Player tab** (`src/client/ui/imgui/PlayerPanel.ts`)
+    - [x] Health slider (0-200), God Mode / Noclip / Infinite Ammo checkboxes
+    - [x] Speed (100-5000 cm/s), Jump Height (50-1000 cm), FOV (40-150°) sliders
+    - [x] Position X/Y/Z inputs + Teleport button
+    - [x] Kill / Respawn action buttons
+- [x] **Bots tab** (`src/client/ui/imgui/BotPanel.ts`)
+    - [x] Bot count display, Add Bot / Kill All / Respawn All buttons
+    - [x] Health slider (all bots), Freeze All / Ragdoll All toggles
+    - [x] AI Difficulty (Live): Aim Accuracy, Reaction Time, FOV, Engage Range, Fire Interval sliders
+    - [x] Bot Details: per-bot tree nodes with weapon, position, state
+- [x] **Settings tab** (drawn by ImGuiManager)
+    - [x] UI Scale slider (0.5-3.0) via `style.FontScaleMain`, persisted to localStorage `fps_imgui_scale`
+- [x] Tabbed layout — single "Debug Panel" window with `BeginTabBar`/`BeginTabItem`
+- [x] L key toggle wired in MainMenuScene, LobbyScene, MatchScene
+
+### Phase 2 — Full Debug Suite (DONE)
+- [x] **Weapons tab** (`src/client/ui/imgui/WeaponsTab.ts`)
+    - [x] Per-weapon stats editing: damage, fire rate, projectile speed, mag size, reload time
+    - [x] Current weapon ammo state (read-only: current mag / reserve)
+    - [x] Weapon switch combo (swap active weapon to any of 9)
+    - [x] Refill Ammo button
+    - [x] Sway parameters: idle/walk amplitudes, recoil kick, recovery speed
+- [x] **Audio tab** (`src/client/ui/imgui/AudioTab.ts`)
+    - [x] Master volume slider
+    - [x] Sound status (footstep/wind playing indicators)
+- [x] **Graphics tab** (`src/client/ui/imgui/GraphicsTab.ts`)
+    - [x] Auto-generated from GRAPHICS_SETTINGS_DESCRIPTORS (no context needed)
+    - [x] MSAA samples, FXAA toggle, bloom, tone mapping, exposure, contrast, sharpen, grain
+    - [x] Grouped by category with CollapsingHeader
+    - [x] Reset to defaults button
+- [x] **Physics tab** (`src/client/ui/imgui/PhysicsTab.ts`)
+    - [x] Move speed, jump height sliders
+    - [x] Player capsule height / radius display (read-only)
+    - [x] Noclip toggle
+    - [x] Projectile lifetime slider
+    - [x] Active projectile count (read-only)
+    - [x] Vertical velocity, player state display
+- [x] **Progression tab** (`src/client/ui/imgui/ProgressionTab.ts`)
+    - [x] Current level and XP display with progress bar
+    - [x] Set level directly (slider 1-30)
+    - [x] Add XP button (configurable amount)
+    - [x] Unlock All Weapons button
+    - [x] Weapon unlocks list with CollapsingHeader
+- [x] **Performance tab** (`src/client/ui/imgui/PerformanceTab.ts`)
+    - [x] FPS counter (current, avg, min, max) with rolling stats
+    - [x] Frame time in ms
+    - [x] Draw calls count
+    - [x] Active meshes count
+    - [x] Active particles count
+    - [x] Total vertices / faces
+    - [x] Resolution display
+    - [x] Reset stats button
+- [x] Wire all new tabs into MatchScene draw callback with context builders

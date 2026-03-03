@@ -328,6 +328,11 @@ export class WeaponManager {
         }
     }
 
+    /** Number of currently active projectiles. */
+    public get activeProjectileCount(): number {
+        return this._projectiles.length;
+    }
+
     /**
      * Disposes all projectiles, muzzle flash, and impact marks.
      */

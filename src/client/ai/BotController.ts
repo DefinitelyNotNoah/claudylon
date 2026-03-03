@@ -109,6 +109,9 @@ export class BotController {
     /** When true, the bot skips all AI logic (stands still, doesn't fire). */
     public frozen: boolean = false;
 
+    /** Per-bot manual freeze set via ImGui. Separate from the global/cull freeze. */
+    public manualFrozen: boolean = false;
+
     // Fire event data emitted this frame (consumed by BotManager)
     private _pendingFireEvent: FireEventData | null = null;
 
@@ -666,6 +669,60 @@ export class BotController {
         this._targetAcquiredTime = 0;
         this._targetScanTimer = 0;
         this._yaw = Math.random() * Math.PI * 2;
+    }
+
+    /**
+     * Forces immediate respawn at a random spawn point, regardless of death state.
+     */
+    public forceRespawn(): void {
+        this._respawn();
+    }
+
+    /**
+     * Forces the bot to die immediately (bypasses normal damage).
+     * Calls _die() internally — increments death count, emits death event, and starts respawn timer.
+     */
+    public forceKill(): void {
+        if (!this._isDead) {
+            this._die();
+        }
+    }
+
+    /**
+     * Teleports the bot to a specific position.
+     * @param x - World X coordinate.
+     * @param y - World Y coordinate.
+     * @param z - World Z coordinate.
+     */
+    public teleport(x: number, y: number, z: number): void {
+        this._characterController.setPosition(new Vector3(x, y, z));
+        this._characterController.setVelocity(Vector3.Zero());
+        this._currentPath = [];
+        this._pathIndex = 0;
+        this._patrolTarget = null;
+    }
+
+    /**
+     * Changes the bot's weapon to a new weapon ID.
+     * @param weaponId - The weapon to equip.
+     */
+    public setWeapon(weaponId: WeaponId): void {
+        this._weaponId = weaponId;
+        this._weapon = new Weapon(WEAPON_STATS[weaponId]);
+    }
+
+    /**
+     * Returns the bot's current difficulty profile (shared reference — mutations apply live).
+     */
+    public get difficulty(): BotDifficulty {
+        return this._difficulty;
+    }
+
+    /**
+     * Returns the bot index (0-based).
+     */
+    public get botIndex(): number {
+        return this._botIndex;
     }
 
     /**

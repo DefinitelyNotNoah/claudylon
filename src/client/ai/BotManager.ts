@@ -261,7 +261,7 @@ export class BotManager {
             const dz = playerPosition.z - bot.position.z;
             const distSq = dx * dx + dz * dz;
             const beyondCull = distSq > cullDistSq;
-            bot.frozen = beyondCull || this._manualFreezeAll || this._ragdollFreezeAll;
+            bot.frozen = beyondCull || this._manualFreezeAll || this._ragdollFreezeAll || bot.manualFrozen;
 
             // Dormancy toggles based on distance (independent of frozen flag)
             if (remote && !bot.isDead) {
@@ -566,6 +566,46 @@ export class BotManager {
             charGlb,
         );
         this._remotes.set(bot.sessionId, remote);
+
+        return name;
+    }
+
+    /**
+     * Removes a specific bot by session ID, disposing its controller and visual.
+     * @param sessionId - The bot's session ID (e.g. "bot_0").
+     * @returns The display name of the removed bot, or null if not found.
+     */
+    public removeBot(sessionId: string): string | null {
+        const bot = this._botMap.get(sessionId);
+        if (!bot) return null;
+
+        const name = bot.displayName;
+
+        // Dispose controller
+        bot.dispose();
+        this._botMap.delete(sessionId);
+        const botIdx = this._bots.indexOf(bot);
+        if (botIdx >= 0) this._bots.splice(botIdx, 1);
+
+        // Dispose visual
+        const remote = this._remotes.get(sessionId);
+        if (remote) {
+            remote.dispose();
+            this._remotes.delete(sessionId);
+        }
+
+        // Remove any projectiles owned by this bot (swap-and-pop without decrement on match)
+        let i = this._botProjectiles.length - 1;
+        while (i >= 0) {
+            if ((this._botProjectiles[i] as any)._ownerSessionId === sessionId) {
+                this._botProjectiles[i].dispose();
+                this._botProjectiles[i] = this._botProjectiles[this._botProjectiles.length - 1];
+                this._botProjectiles.pop();
+                // Don't decrement — re-check same index (swapped element may also match)
+            } else {
+                i--;
+            }
+        }
 
         return name;
     }

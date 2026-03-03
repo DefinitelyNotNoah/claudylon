@@ -9,27 +9,19 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 
 import { PlayerStateEnum } from "../../shared/types";
 
-/** How quickly sway transitions between states (lerp speed per second). */
-const SWAY_LERP_SPEED = 6.0;
-
-/** Recoil kick amount (cm backward / upward). */
-const RECOIL_KICK_Z = -1.5;
-const RECOIL_KICK_Y = 0.8;
-
-/** How quickly recoil recovers (per second). */
-const RECOIL_RECOVERY_SPEED = 12.0;
-
-/** Idle: gentle figure-8 breathing. */
-const IDLE_SWAY_X = 0.06;
-const IDLE_SWAY_Y = 0.04;
-const IDLE_FREQ_X = 0.2;
-const IDLE_FREQ_Y = 0.3;
-
-/** Walking: side-to-side pendulum swing + vertical bob. */
-const WALK_SWING_X = 0.45;
-const WALK_BOB_Y = 0.15;
-const WALK_FREQ = 1.8;
-const WALK_TILT_Z = 0.005;
+/** Default sway parameter values. */
+const DEFAULT_SWAY_LERP_SPEED = 6.0;
+const DEFAULT_RECOIL_KICK_Z = -1.5;
+const DEFAULT_RECOIL_KICK_Y = 0.8;
+const DEFAULT_RECOIL_RECOVERY_SPEED = 12.0;
+const DEFAULT_IDLE_SWAY_X = 0.06;
+const DEFAULT_IDLE_SWAY_Y = 0.04;
+const DEFAULT_IDLE_FREQ_X = 0.2;
+const DEFAULT_IDLE_FREQ_Y = 0.3;
+const DEFAULT_WALK_SWING_X = 0.45;
+const DEFAULT_WALK_BOB_Y = 0.15;
+const DEFAULT_WALK_FREQ = 1.8;
+const DEFAULT_WALK_TILT_Z = 0.005;
 
 /** Airborne: weapon dips based on vertical velocity. */
 const AIRBORNE_OFFSET_Y_MAX = -0.5;
@@ -57,6 +49,20 @@ export class WeaponSway {
 
     private _recoilZ: number = 0;
     private _recoilY: number = 0;
+
+    /** Tunable sway parameters — exposed for ImGui live editing. */
+    public swayLerpSpeed: number = DEFAULT_SWAY_LERP_SPEED;
+    public recoilKickZ: number = DEFAULT_RECOIL_KICK_Z;
+    public recoilKickY: number = DEFAULT_RECOIL_KICK_Y;
+    public recoilRecoverySpeed: number = DEFAULT_RECOIL_RECOVERY_SPEED;
+    public idleSwayX: number = DEFAULT_IDLE_SWAY_X;
+    public idleSwayY: number = DEFAULT_IDLE_SWAY_Y;
+    public idleFreqX: number = DEFAULT_IDLE_FREQ_X;
+    public idleFreqY: number = DEFAULT_IDLE_FREQ_Y;
+    public walkSwingX: number = DEFAULT_WALK_SWING_X;
+    public walkBobY: number = DEFAULT_WALK_BOB_Y;
+    public walkFreq: number = DEFAULT_WALK_FREQ;
+    public walkTiltZ: number = DEFAULT_WALK_TILT_Z;
 
     /**
      * Creates the weapon sway system.
@@ -104,25 +110,25 @@ export class WeaponSway {
             targetX = 0;
             targetTiltZ = 0;
         } else if (playerState === PlayerStateEnum.Walking) {
-            targetX = Math.sin(t * WALK_FREQ) * WALK_SWING_X;
-            targetY = Math.abs(Math.sin(t * WALK_FREQ)) * WALK_BOB_Y;
+            targetX = Math.sin(t * this.walkFreq) * this.walkSwingX;
+            targetY = Math.abs(Math.sin(t * this.walkFreq)) * this.walkBobY;
             targetTiltX = 0;
-            targetTiltZ = -Math.sin(t * WALK_FREQ) * WALK_TILT_Z;
+            targetTiltZ = -Math.sin(t * this.walkFreq) * this.walkTiltZ;
         } else {
-            targetX = Math.sin(t * IDLE_FREQ_X) * IDLE_SWAY_X;
-            targetY = Math.sin(t * IDLE_FREQ_Y) * IDLE_SWAY_Y;
+            targetX = Math.sin(t * this.idleFreqX) * this.idleSwayX;
+            targetY = Math.sin(t * this.idleFreqY) * this.idleSwayY;
             targetTiltX = 0;
             targetTiltZ = 0;
         }
 
-        const lerpFactor = Math.min(1, SWAY_LERP_SPEED * dt);
+        const lerpFactor = Math.min(1, this.swayLerpSpeed * dt);
         this._currentOffsetX += (targetX - this._currentOffsetX) * lerpFactor;
         this._currentOffsetY += (targetY - this._currentOffsetY) * lerpFactor;
         this._currentTiltX += (targetTiltX - this._currentTiltX) * lerpFactor;
         this._currentTiltZ += (targetTiltZ - this._currentTiltZ) * lerpFactor;
 
-        this._recoilZ += (0 - this._recoilZ) * Math.min(1, RECOIL_RECOVERY_SPEED * dt);
-        this._recoilY += (0 - this._recoilY) * Math.min(1, RECOIL_RECOVERY_SPEED * dt);
+        this._recoilZ += (0 - this._recoilZ) * Math.min(1, this.recoilRecoverySpeed * dt);
+        this._recoilY += (0 - this._recoilY) * Math.min(1, this.recoilRecoverySpeed * dt);
 
         this._anchor.position.set(
             this._basePosition.x + this._currentOffsetX,
@@ -141,8 +147,8 @@ export class WeaponSway {
      * Triggers a recoil kick when the weapon fires.
      */
     public triggerRecoil(): void {
-        this._recoilZ += RECOIL_KICK_Z;
-        this._recoilY += RECOIL_KICK_Y;
+        this._recoilZ += this.recoilKickZ;
+        this._recoilY += this.recoilKickY;
     }
 
     /**

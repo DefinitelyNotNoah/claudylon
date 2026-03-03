@@ -24,6 +24,7 @@ const DISPLAY_NAME_KEY = "fps_display_name";
  */
 export class LobbyScene extends GameScene {
     private _lobbyUI: LobbyUI | null = null;
+    private _onKeyDown: ((e: KeyboardEvent) => void) | null = null;
 
     /**
      * Initializes the lobby scene with a dark background and GUI.
@@ -67,6 +68,14 @@ export class LobbyScene extends GameScene {
             this._lobbyUI?.updatePlayers(players, newIsHost);
         };
 
+        // L toggles ImGui overlay
+        this._onKeyDown = (e: KeyboardEvent) => {
+            if (e.code === "KeyL") {
+                this._manager.imguiManager.toggle();
+            }
+        };
+        window.addEventListener("keydown", this._onKeyDown);
+
         // Listen for game starting
         network.onGameStarting = async () => {
             const displayName = localStorage.getItem(DISPLAY_NAME_KEY) || "Player";
@@ -79,6 +88,10 @@ export class LobbyScene extends GameScene {
      * Disposes the lobby UI and cleans up network callbacks.
      */
     public override dispose(): void {
+        if (this._onKeyDown) {
+            window.removeEventListener("keydown", this._onKeyDown);
+        }
+        this._manager.imguiManager.setDrawCallback(null);
         const network = NetworkManager.getInstance();
         network.onLobbyStateChange = null;
         network.onGameStarting = null;

@@ -56,6 +56,7 @@ export class MainMenuScene extends GameScene {
     private _camera: FreeCamera | null = null;
     private _orbitAngle: number = 0;
     private _shadowGenerator: ShadowGenerator | null = null;
+    private _onKeyDown: ((e: KeyboardEvent) => void) | null = null;
 
     /**
      * Initializes the menu scene: map visuals, lighting, camera orbit, and UI.
@@ -80,6 +81,14 @@ export class MainMenuScene extends GameScene {
         this._scene.onBeforeRenderObservable.add(() => {
             this._updateOrbit();
         });
+
+        // L toggles ImGui overlay
+        this._onKeyDown = (e: KeyboardEvent) => {
+            if (e.code === "KeyL") {
+                this._manager.imguiManager.toggle();
+            }
+        };
+        window.addEventListener("keydown", this._onKeyDown);
 
         this._menuUI = new MainMenuUI(
             this._scene,
@@ -274,6 +283,10 @@ export class MainMenuScene extends GameScene {
      * Disposes menu UI and scene resources.
      */
     public override dispose(): void {
+        if (this._onKeyDown) {
+            window.removeEventListener("keydown", this._onKeyDown);
+        }
+        this._manager.imguiManager.setDrawCallback(null);
         this._menuUI?.dispose();
         this._shadowGenerator?.dispose();
         GraphicsSettings.getInstance().unbindPipeline();

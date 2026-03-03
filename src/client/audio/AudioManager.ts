@@ -239,6 +239,13 @@ export class AudioManager {
     }
 
     /**
+     * Returns the current master volume (0-1).
+     */
+    public getMasterVolume(): number {
+        return Engine.audioEngine?.getGlobalVolume() ?? 1;
+    }
+
+    /**
      * Sets the master volume for all audio output.
      * @param volume - Volume level between 0 (mute) and 1 (full).
      */

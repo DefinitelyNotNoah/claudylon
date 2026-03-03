@@ -19,6 +19,7 @@
 		"@babylonjs/materials": "8.41.0",
 		"@colyseus/schema": "^4.0.15",
 		"@colyseus/sdk": "^0.17.34",
+		"@mori2003/jsimgui": "^0.13.0",
 		"babylonjs-editor-tools": "^5.3.1",
 		"colyseus": "^0.17.8",
 		"recast-detour": "^1.6.4",
