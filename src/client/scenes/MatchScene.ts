@@ -2611,7 +2611,7 @@ export class MatchScene extends GameScene {
         }
 
         if (this._weaponSway) {
-            this._weaponSway.update(dt, this._playerController.state, this._playerController.verticalVelocity);
+            this._weaponSway.update(dt, this._playerController.state, this._playerController.verticalVelocity, this._playerController.leanAmount);
         }
 
         const weapon = this._weaponManager.activeWeapon;
@@ -2938,6 +2938,19 @@ export class MatchScene extends GameScene {
             getLockedPitch: () => this._mirrorClone?.lockedPitch ?? 0,
             setLockedPitch: (v) => {
                 if (this._mirrorClone) this._mirrorClone.lockedPitch = v;
+            },
+            getLeanAmount: () => this._playerController?.leanAmount ?? 0,
+            getMaxLeanAngle: () => this._playerController?.maxLeanAngle ?? 0.26,
+            setMaxLeanAngle: (v) => {
+                if (this._playerController) this._playerController.maxLeanAngle = v;
+            },
+            getLeanSpeed: () => this._playerController?.leanSpeed ?? 8,
+            setLeanSpeed: (v) => {
+                if (this._playerController) this._playerController.leanSpeed = v;
+            },
+            getLeanOffset: () => this._playerController?.leanOffset ?? 30,
+            setLeanOffset: (v) => {
+                if (this._playerController) this._playerController.leanOffset = v;
             },
         };
     }

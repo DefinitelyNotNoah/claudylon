@@ -216,6 +216,11 @@ export class MirrorClone {
         );
         this._remote.update(dt);
 
+        // Apply lean tilt to the clone's upper spine bone
+        const leanAmount = this._playerController.leanAmount;
+        const leanAngle = -leanAmount * this._playerController.maxLeanAngle;
+        this._applyLeanToBones(leanAngle);
+
         this._lastWeaponId = weaponId;
     }
 
@@ -232,6 +237,29 @@ export class MirrorClone {
         // Play spatial gunshot at clone's position
         if (this._audioManager) {
             this._audioManager.playGunshotAt(audioFile, this._remote.position);
+        }
+    }
+
+    /**
+     * Applies lean rotation to the clone's upper spine bone.
+     * Rotating Spine1 tilts the upper body, arms, head, and weapon naturally.
+     * @param leanAngle - Lean angle in radians (negative = left, positive = right).
+     */
+    private _applyLeanToBones(leanAngle: number): void {
+        if (!this._remote) return;
+
+        const charModel = this._remote.characterModel;
+        if (!charModel || !charModel.skeleton) return;
+
+        // Find and rotate Spine1 bone (upper spine — tilts torso, arms, head)
+        for (const bone of charModel.skeleton.bones) {
+            if (bone.name === "mixamorig:Spine1") {
+                const tn = bone.getTransformNode();
+                if (tn) {
+                    tn.rotation.z = leanAngle;
+                }
+                break;
+            }
         }
     }
 

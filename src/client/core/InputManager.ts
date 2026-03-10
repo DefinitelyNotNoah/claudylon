@@ -215,6 +215,16 @@ export class InputManager {
         return pressed;
     }
 
+    /** True while Q is held (lean left). */
+    public get leanLeft(): boolean {
+        return this._keys.get("KeyQ") ?? false;
+    }
+
+    /** True while E is held (lean right). */
+    public get leanRight(): boolean {
+        return this._keys.get("KeyE") ?? false;
+    }
+
     /** True only on the frame F is first pressed (one-shot). */
     public get interact(): boolean {
         const pressed = this._keysJustPressed.get("KeyF") ?? false;

@@ -54,6 +54,14 @@ export class PlayerController {
     private _currentHealth: number = PLAYER_STATS.health;
     /** Whether noclip (free-fly) mode is active. */
     private _noclip: boolean = false;
+    /** Current lean amount: -1 = full left, 0 = upright, +1 = full right. */
+    private _leanAmount: number = 0;
+    /** Maximum lean angle in radians (default ~15 degrees). */
+    private _maxLeanAngle: number = 0.26;
+    /** How fast leaning interpolates (per second). */
+    private _leanSpeed: number = 8.0;
+    /** Horizontal camera offset when fully leaned (cm). */
+    private _leanOffset: number = 30;
     /** Noclip fly speed in cm/s. */
     private static readonly NOCLIP_SPEED = 2000;
 
@@ -113,6 +121,38 @@ export class PlayerController {
     /** Current pitch rotation in radians. */
     public get pitch(): number {
         return this._pitch;
+    }
+
+    /** Current lean amount: -1 = full left, 0 = upright, +1 = full right. */
+    public get leanAmount(): number {
+        return this._leanAmount;
+    }
+
+    /** Maximum lean angle in radians. */
+    public get maxLeanAngle(): number {
+        return this._maxLeanAngle;
+    }
+
+    public set maxLeanAngle(value: number) {
+        this._maxLeanAngle = value;
+    }
+
+    /** Lean interpolation speed. */
+    public get leanSpeed(): number {
+        return this._leanSpeed;
+    }
+
+    public set leanSpeed(value: number) {
+        this._leanSpeed = value;
+    }
+
+    /** Horizontal camera offset when fully leaned (cm). */
+    public get leanOffset(): number {
+        return this._leanOffset;
+    }
+
+    public set leanOffset(value: number) {
+        this._leanOffset = value;
     }
 
     /**
@@ -222,6 +262,7 @@ export class PlayerController {
         }
 
         this._applyMouseLook();
+        this._updateLean(dt);
 
         // Toggle noclip
         if (this._inputManager.noclip) {
@@ -294,6 +335,24 @@ export class PlayerController {
             -Math.PI / 2 + 0.01,
             Math.min(Math.PI / 2 - 0.01, this._pitch)
         );
+    }
+
+    /**
+     * Smoothly interpolates lean amount based on Q/E input.
+     * @param dt - Delta time in seconds.
+     */
+    private _updateLean(dt: number): void {
+        let targetLean = 0;
+        if (this._inputManager.leanLeft) targetLean -= 1;
+        if (this._inputManager.leanRight) targetLean += 1;
+
+        const lerpFactor = Math.min(1, this._leanSpeed * dt);
+        this._leanAmount += (targetLean - this._leanAmount) * lerpFactor;
+
+        // Snap to zero when very close (avoids float drift)
+        if (Math.abs(this._leanAmount) < 0.001) {
+            this._leanAmount = 0;
+        }
     }
 
     /**
@@ -373,8 +432,18 @@ export class PlayerController {
         const pos = this._characterController.getPosition();
         const eyeHeight = PLAYER_STATS.capsuleHeight / 2 - 15;
 
-        this._camera.position.set(pos.x, pos.y + eyeHeight, pos.z);
-        this._camera.rotation.set(this._pitch, this._yaw, 0);
+        // Lean: horizontal camera offset perpendicular to facing direction
+        const leanRoll = -this._leanAmount * this._maxLeanAngle;
+        const lateralOffset = this._leanAmount * this._leanOffset;
+        const rightX = Math.cos(this._yaw);
+        const rightZ = -Math.sin(this._yaw);
+
+        this._camera.position.set(
+            pos.x + rightX * lateralOffset,
+            pos.y + eyeHeight,
+            pos.z + rightZ * lateralOffset,
+        );
+        this._camera.rotation.set(this._pitch, this._yaw, leanRoll);
     }
 
     /**

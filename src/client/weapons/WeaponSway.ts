@@ -80,8 +80,9 @@ export class WeaponSway {
      * @param dt - Delta time in seconds.
      * @param playerState - The current player movement state.
      * @param verticalVelocity - The player's current vertical velocity in cm/s (positive = up).
+     * @param leanAmount - Current lean amount (-1 left, 0 center, +1 right).
      */
-    public update(dt: number, playerState: PlayerStateEnum, verticalVelocity: number = 0): void {
+    public update(dt: number, playerState: PlayerStateEnum, verticalVelocity: number = 0, leanAmount: number = 0): void {
         this._elapsedTime += dt;
 
         let targetX = 0;
@@ -130,8 +131,12 @@ export class WeaponSway {
         this._recoilZ += (0 - this._recoilZ) * Math.min(1, this.recoilRecoverySpeed * dt);
         this._recoilY += (0 - this._recoilY) * Math.min(1, this.recoilRecoverySpeed * dt);
 
+        // Lean shifts the viewmodel sideways and adds a slight tilt
+        const leanViewmodelShift = leanAmount * 3.0;
+        const leanViewmodelTilt = leanAmount * 0.08;
+
         this._anchor.position.set(
-            this._basePosition.x + this._currentOffsetX,
+            this._basePosition.x + this._currentOffsetX + leanViewmodelShift,
             this._basePosition.y + this._currentOffsetY + this._recoilY,
             this._basePosition.z + this._recoilZ
         );
@@ -139,7 +144,7 @@ export class WeaponSway {
         this._anchor.rotation.set(
             this._currentTiltX,
             0,
-            this._currentTiltZ
+            this._currentTiltZ + leanViewmodelTilt
         );
     }
 

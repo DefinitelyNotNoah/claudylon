@@ -1,6 +1,7 @@
 /**
  * Dear ImGui tab content for the Mirror Clone debug tool.
- * Provides spawn/despawn, collision toggle, rotation lock, and aim controls.
+ * Provides spawn/despawn, collision toggle, rotation lock, aim controls,
+ * and leaning parameter tuning.
  * Drawn inside a TabItem — does NOT create its own window.
  * @module client/ui/imgui/MirrorTab
  */
@@ -25,6 +26,13 @@ export interface MirrorTabContext {
     setLockedYaw: (v: number) => void;
     getLockedPitch: () => number;
     setLockedPitch: (v: number) => void;
+    getLeanAmount: () => number;
+    getMaxLeanAngle: () => number;
+    setMaxLeanAngle: (v: number) => void;
+    getLeanSpeed: () => number;
+    setLeanSpeed: (v: number) => void;
+    getLeanOffset: () => number;
+    setLeanOffset: (v: number) => void;
 }
 
 // Persistent mutable refs for ImGui widgets
@@ -33,6 +41,9 @@ const _collisionEnabled: [boolean] = [false];
 const _rotationLocked: [boolean] = [false];
 const _lockedYawDeg: [number] = [0];
 const _lockedPitchDeg: [number] = [0];
+const _maxLeanAngleDeg: [number] = [15];
+const _leanSpeed: [number] = [8];
+const _leanOffset: [number] = [30];
 
 /**
  * Draws the Mirror tab content (no Begin/End window — caller manages that).
@@ -43,11 +54,11 @@ export function drawMirrorTab(ctx: MirrorTabContext): void {
 
     // ─── Spawn / Despawn ──────────────────────────────────
     if (!spawned) {
-        if (ImGui.Button("Spawn Clone", )) {
+        if (ImGui.Button("Spawn Clone")) {
             ctx.spawn();
         }
     } else {
-        if (ImGui.Button("Despawn Clone", )) {
+        if (ImGui.Button("Despawn Clone")) {
             ctx.despawn();
         }
     }
@@ -75,6 +86,33 @@ export function drawMirrorTab(ctx: MirrorTabContext): void {
 
     ImGui.Separator();
 
+    // ─── Leaning ──────────────────────────────────────────
+    if (ImGui.CollapsingHeader("Leaning", ImGui.TreeNodeFlags.DefaultOpen)) {
+        // Current lean amount (read-only display)
+        const leanAmount = ctx.getLeanAmount();
+        ImGui.Text(`Current Lean: ${leanAmount.toFixed(2)} (Q = left, E = right)`);
+        ImGui.ProgressBar((leanAmount + 1) / 2, { x: -1, y: 0 }, `${(leanAmount * 100).toFixed(0)}%`);
+
+        ImGui.Spacing();
+
+        _maxLeanAngleDeg[0] = ctx.getMaxLeanAngle() * (180 / Math.PI);
+        if (ImGui.SliderFloat("Max Lean Angle (deg)", _maxLeanAngleDeg, 1, 45)) {
+            ctx.setMaxLeanAngle(_maxLeanAngleDeg[0] * (Math.PI / 180));
+        }
+
+        _leanSpeed[0] = ctx.getLeanSpeed();
+        if (ImGui.SliderFloat("Lean Speed", _leanSpeed, 1, 20)) {
+            ctx.setLeanSpeed(_leanSpeed[0]);
+        }
+
+        _leanOffset[0] = ctx.getLeanOffset();
+        if (ImGui.SliderFloat("Lean Offset (cm)", _leanOffset, 0, 80)) {
+            ctx.setLeanOffset(_leanOffset[0]);
+        }
+    }
+
+    ImGui.Separator();
+
     // ─── Rotation Lock ────────────────────────────────────
     if (ImGui.CollapsingHeader("Rotation", ImGui.TreeNodeFlags.DefaultOpen)) {
         _rotationLocked[0] = ctx.getRotationLocked();
@@ -94,8 +132,7 @@ export function drawMirrorTab(ctx: MirrorTabContext): void {
                 ctx.setLockedPitch(_lockedPitchDeg[0] * (Math.PI / 180));
             }
 
-            if (ImGui.Button("Reset to Player Facing", )) {
-                // Will be set to current player yaw + PI (facing player) via context
+            if (ImGui.Button("Reset to Player Facing")) {
                 ctx.setLockedYaw(0);
                 ctx.setLockedPitch(0);
             }
