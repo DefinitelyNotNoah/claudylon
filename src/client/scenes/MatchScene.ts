@@ -82,6 +82,7 @@ import { drawGraphicsTab } from "../ui/imgui/GraphicsTab";
 import { drawPhysicsTab } from "../ui/imgui/PhysicsTab";
 import { drawProgressionTab } from "../ui/imgui/ProgressionTab";
 import { drawPerformanceTab } from "../ui/imgui/PerformanceTab";
+import { drawMirrorTab } from "../ui/imgui/MirrorTab";
 import type { PlayerPanelContext } from "../ui/imgui/PlayerPanel";
 import type { BotPanelContext, BotInfo } from "../ui/imgui/BotPanel";
 import type { WeaponsTabContext } from "../ui/imgui/WeaponsTab";
@@ -89,6 +90,8 @@ import type { AudioTabContext } from "../ui/imgui/AudioTab";
 import type { PhysicsTabContext } from "../ui/imgui/PhysicsTab";
 import type { ProgressionTabContext } from "../ui/imgui/ProgressionTab";
 import type { PerformanceTabContext } from "../ui/imgui/PerformanceTab";
+import type { MirrorTabContext } from "../ui/imgui/MirrorTab";
+import { MirrorClone } from "../debug/MirrorClone";
 import { PROJECTILE_LIFETIME, setProjectileLifetime } from "../weapons/Projectile";
 import { WEAPON_UNLOCK_REQUIREMENTS } from "../../shared/constants/WeaponConstants";
 
@@ -168,6 +171,9 @@ export class MatchScene extends GameScene {
 
     // ─── Test Dummies (ragdoll debugging) ───────────────────────
     private _testDummies: Map<string, RemotePlayer> = new Map();
+
+    // ─── Mirror Clone ─────────────────────────────────────────────
+    private _mirrorClone: MirrorClone | null = null;
 
     // ─── Developer Console ────────────────────────────────────────
     private _consoleUI: DeveloperConsoleUI | null = null;
@@ -391,6 +397,10 @@ export class MatchScene extends GameScene {
                 drawPerformanceTab(this._buildPerformanceTabContext());
                 ImGui.EndTabItem();
             }
+            if (ImGui.BeginTabItem("Mirror")) {
+                drawMirrorTab(this._buildMirrorTabContext());
+                ImGui.EndTabItem();
+            }
         });
 
         // ─── Weapon Drop System ──────────────────────────────────
@@ -595,6 +605,9 @@ export class MatchScene extends GameScene {
                 } else if (this._botManager && this._playerController) {
                     this._updateBots(dt);
                 }
+
+                // Mirror clone tracks player state
+                this._mirrorClone?.update(dt);
             }
 
             // Minimap update (runs even when paused)
@@ -2591,8 +2604,10 @@ export class MatchScene extends GameScene {
         this._weaponManager.update(dt, this._inputManager, this._playerController.camera);
         const newAmmo = this._weaponManager.activeWeapon.currentAmmo;
 
-        if (newAmmo < prevAmmo && this._weaponSway) {
-            this._weaponSway.triggerRecoil();
+        if (newAmmo < prevAmmo) {
+            this._weaponSway?.triggerRecoil();
+            // Mirror clone fires when player fires
+            this._mirrorClone?.triggerFire(this._weaponManager.activeWeapon.stats.audioFile);
         }
 
         if (this._weaponSway) {
@@ -2884,6 +2899,50 @@ export class MatchScene extends GameScene {
     }
 
     /**
+     * Builds context for the Mirror Clone ImGui tab.
+     */
+    private _buildMirrorTabContext(): MirrorTabContext {
+        return {
+            isSpawned: () => this._mirrorClone?.isSpawned ?? false,
+            spawn: () => {
+                if (!this._playerController || !this._weaponManager) return;
+                if (!this._mirrorClone) {
+                    this._mirrorClone = new MirrorClone(
+                        this._scene,
+                        this._playerController,
+                        this._weaponManager,
+                        this._audioManager,
+                    );
+                }
+                this._mirrorClone.spawn();
+            },
+            despawn: () => {
+                this._mirrorClone?.despawn();
+            },
+            getOffsetDistance: () => this._mirrorClone?.offsetDistance ?? 200,
+            setOffsetDistance: (v) => {
+                if (this._mirrorClone) this._mirrorClone.offsetDistance = v;
+            },
+            getCollisionEnabled: () => this._mirrorClone?.collisionEnabled ?? false,
+            setCollisionEnabled: (v) => {
+                if (this._mirrorClone) this._mirrorClone.collisionEnabled = v;
+            },
+            getRotationLocked: () => this._mirrorClone?.rotationLocked ?? false,
+            setRotationLocked: (v) => {
+                if (this._mirrorClone) this._mirrorClone.rotationLocked = v;
+            },
+            getLockedYaw: () => this._mirrorClone?.lockedYaw ?? 0,
+            setLockedYaw: (v) => {
+                if (this._mirrorClone) this._mirrorClone.lockedYaw = v;
+            },
+            getLockedPitch: () => this._mirrorClone?.lockedPitch ?? 0,
+            setLockedPitch: (v) => {
+                if (this._mirrorClone) this._mirrorClone.lockedPitch = v;
+            },
+        };
+    }
+
+    /**
      * Disposes all scene resources including player, weapon, HUD, input, and networking.
      */
     public override dispose(): void {
@@ -2940,6 +2999,7 @@ export class MatchScene extends GameScene {
         for (const mat of this._debugCapsuleMaterials) mat.dispose();
         this._debugCapsuleMaterials = [];
         this._debugCapsuleOriginalState.clear();
+        this._mirrorClone?.dispose();
         this._debugNavMesh?.dispose();
         this._weaponDropManager?.dispose();
         this._botManager?.dispose();

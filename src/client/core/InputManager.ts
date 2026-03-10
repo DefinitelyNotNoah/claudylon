@@ -215,11 +215,11 @@ export class InputManager {
         return pressed;
     }
 
-    /** True only on the frame E is first pressed (one-shot). */
+    /** True only on the frame F is first pressed (one-shot). */
     public get interact(): boolean {
-        const pressed = this._keysJustPressed.get("KeyE") ?? false;
+        const pressed = this._keysJustPressed.get("KeyF") ?? false;
         if (pressed) {
-            this._keysJustPressed.set("KeyE", false);
+            this._keysJustPressed.set("KeyF", false);
         }
         return pressed;
     }

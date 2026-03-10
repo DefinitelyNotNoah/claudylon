@@ -182,6 +182,7 @@ Transitions: Idle ↔ Walking (input), Idle/Walking → Jumping (space while gro
 | Left Click | Fire |
 | R | Reload |
 | Space | Jump |
+| F | Interact / Pickup |
 | V | Toggle Noclip (free-fly mode, 2000 cm/s) |
 | P | Pause (NOT ESC — ESC triggers pointer lock cooldown) |
 | L | Toggle ImGui Debug Panel (works even when input suppressed) |

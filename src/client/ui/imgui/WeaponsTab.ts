@@ -110,7 +110,7 @@ export function drawWeaponsTab(ctx: WeaponsTabContext): void {
         }
 
         _projSpeed[0] = ctx.getProjectileSpeed();
-        if (ImGui.SliderFloat("Projectile Speed", _projSpeed, 10000, 200000, "%.0f cm/s")) {
+        if (ImGui.SliderFloat("Projectile Speed", _projSpeed, 0, 200000, "%.0f cm/s")) {
             ctx.setProjectileSpeed(_projSpeed[0]);
         }
 
