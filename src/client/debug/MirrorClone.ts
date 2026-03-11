@@ -18,6 +18,9 @@ import type { AudioManager } from "../audio/AudioManager";
 /** Default distance (cm) in front of the player where the clone spawns. */
 const DEFAULT_OFFSET_DISTANCE = 200;
 
+/** Max third-person torso lean angle in radians (~15 degrees). */
+const TP_LEAN_ANGLE = 0.26;
+
 /**
  * Manages a mirror clone RemotePlayer that tracks the local player.
  */
@@ -240,9 +243,10 @@ export class MirrorClone {
         );
         this._remote.update(dt);
 
-        // Store lean angle — applied after animation evaluation via observer
+        // Store lean angle — applied after animation evaluation via observer.
+        // Uses a separate TP_LEAN_ANGLE for torso tilt (less than camera lean).
         const leanAmount = this._playerController.leanAmount;
-        this._pendingLeanAngle = -leanAmount * this._playerController.maxLeanAngle;
+        this._pendingLeanAngle = -leanAmount * TP_LEAN_ANGLE;
 
         this._lastWeaponId = weaponId;
     }
