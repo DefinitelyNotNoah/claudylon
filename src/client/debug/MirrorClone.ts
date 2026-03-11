@@ -18,8 +18,8 @@ import type { AudioManager } from "../audio/AudioManager";
 /** Default distance (cm) in front of the player where the clone spawns. */
 const DEFAULT_OFFSET_DISTANCE = 200;
 
-/** Max third-person torso lean angle in radians (~15 degrees). */
-const TP_LEAN_ANGLE = 0.26;
+/** Spine bones to distribute lean across (top-down order). */
+const LEAN_BONES = ["mixamorig:Spine", "mixamorig:Spine1", "mixamorig:Spine2"];
 
 /**
  * Manages a mirror clone RemotePlayer that tracks the local player.
@@ -49,8 +49,11 @@ export class MirrorClone {
     /** The last weapon ID synced, to detect changes. */
     private _lastWeaponId: string = "";
 
-    /** Cached Spine1 bone TransformNode for lean rotation. */
-    private _spineBoneNode: TransformNode | null = null;
+    /** How much of the camera lean angle to apply to the torso (0-1). */
+    private _torsoLeanRatio: number = 0.6;
+
+    /** Cached spine bone TransformNodes for lean rotation. */
+    private _spineBoneNodes: TransformNode[] = [];
 
     /** Observer that applies lean rotation after skeleton animation evaluates. */
     private _afterAnimObserver: Observer<Scene> | null = null;
@@ -139,6 +142,15 @@ export class MirrorClone {
         this._lockedPitch = value;
     }
 
+    /** How much of the camera lean angle to apply to the torso (0-1). */
+    public get torsoLeanRatio(): number {
+        return this._torsoLeanRatio;
+    }
+
+    public set torsoLeanRatio(value: number) {
+        this._torsoLeanRatio = Math.max(0, Math.min(2, value));
+    }
+
     /**
      * Spawns the mirror clone at an offset in front of the player.
      * If already spawned, does nothing.
@@ -200,7 +212,7 @@ export class MirrorClone {
             this._scene.onAfterAnimationsObservable.remove(this._afterAnimObserver);
             this._afterAnimObserver = null;
         }
-        this._spineBoneNode = null;
+        this._spineBoneNodes = [];
         this._pendingLeanAngle = 0;
 
         this._remote.dispose();
@@ -244,9 +256,10 @@ export class MirrorClone {
         this._remote.update(dt);
 
         // Store lean angle — applied after animation evaluation via observer.
-        // Uses a separate TP_LEAN_ANGLE for torso tilt (less than camera lean).
+        // Scale the camera lean by torsoLeanRatio for the third-person model.
         const leanAmount = this._playerController.leanAmount;
-        this._pendingLeanAngle = -leanAmount * TP_LEAN_ANGLE;
+        const maxAngle = this._playerController.maxLeanAngle * this._torsoLeanRatio;
+        this._pendingLeanAngle = -leanAmount * maxAngle;
 
         this._lastWeaponId = weaponId;
     }
@@ -268,33 +281,39 @@ export class MirrorClone {
     }
 
     /**
-     * Applies lean rotation to the Spine1 bone after skeleton animation evaluation.
-     * Called from onAfterAnimationsObservable so it runs after bone poses are set,
-     * preventing animations from overwriting the lean tilt.
+     * Applies lean rotation distributed across spine bones after skeleton
+     * animation evaluation. Distributing the angle across Spine, Spine1,
+     * and Spine2 produces a natural curve instead of a single harsh joint.
      */
     private _applyLeanToBone(): void {
         if (!this._remote || Math.abs(this._pendingLeanAngle) < 0.001) return;
 
-        // Lazily find and cache the Spine1 bone TransformNode
-        if (!this._spineBoneNode) {
+        // Lazily find and cache all spine bone TransformNodes
+        if (this._spineBoneNodes.length === 0) {
             const charModel = this._remote.characterModel;
             if (!charModel || !charModel.skeleton) return;
 
-            for (const bone of charModel.skeleton.bones) {
-                if (bone.name === "mixamorig:Spine1") {
-                    this._spineBoneNode = bone.getTransformNode() ?? null;
-                    break;
+            for (const boneName of LEAN_BONES) {
+                for (const bone of charModel.skeleton.bones) {
+                    if (bone.name === boneName) {
+                        const tn = bone.getTransformNode();
+                        if (tn) this._spineBoneNodes.push(tn);
+                        break;
+                    }
                 }
             }
-            if (!this._spineBoneNode) return;
+            if (this._spineBoneNodes.length === 0) return;
         }
 
-        // Bone TransformNodes use rotationQuaternion (set by animation system).
-        // Multiply a local Z-axis rotation onto the existing animation pose.
-        const q = this._spineBoneNode.rotationQuaternion;
-        if (q) {
-            const leanQ = Quaternion.RotationAxis(Vector3.Forward(), this._pendingLeanAngle);
-            this._spineBoneNode.rotationQuaternion = q.multiply(leanQ);
+        // Distribute the total lean angle evenly across the spine bones
+        const perBoneAngle = this._pendingLeanAngle / this._spineBoneNodes.length;
+        const leanQ = Quaternion.RotationAxis(Vector3.Forward(), perBoneAngle);
+
+        for (const tn of this._spineBoneNodes) {
+            const q = tn.rotationQuaternion;
+            if (q) {
+                tn.rotationQuaternion = q.multiply(leanQ);
+            }
         }
     }
 

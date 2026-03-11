@@ -2952,6 +2952,10 @@ export class MatchScene extends GameScene {
             setLeanOffset: (v) => {
                 if (this._playerController) this._playerController.leanOffset = v;
             },
+            getTorsoLeanRatio: () => this._mirrorClone?.torsoLeanRatio ?? 0.6,
+            setTorsoLeanRatio: (v) => {
+                if (this._mirrorClone) this._mirrorClone.torsoLeanRatio = v;
+            },
         };
     }
 

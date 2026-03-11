@@ -33,6 +33,8 @@ export interface MirrorTabContext {
     setLeanSpeed: (v: number) => void;
     getLeanOffset: () => number;
     setLeanOffset: (v: number) => void;
+    getTorsoLeanRatio: () => number;
+    setTorsoLeanRatio: (v: number) => void;
 }
 
 // Persistent mutable refs for ImGui widgets
@@ -44,6 +46,7 @@ const _lockedPitchDeg: [number] = [0];
 const _maxLeanAngleDeg: [number] = [15];
 const _leanSpeed: [number] = [8];
 const _leanOffset: [number] = [30];
+const _torsoLeanRatio: [number] = [0.6];
 
 /**
  * Draws the Mirror tab content (no Begin/End window — caller manages that).
@@ -108,6 +111,19 @@ export function drawMirrorTab(ctx: MirrorTabContext): void {
         _leanOffset[0] = ctx.getLeanOffset();
         if (ImGui.SliderFloat("Lean Offset (cm)", _leanOffset, 0, 80)) {
             ctx.setLeanOffset(_leanOffset[0]);
+        }
+
+        ImGui.Spacing();
+        ImGui.TextDisabled("Clone Torso");
+
+        _torsoLeanRatio[0] = ctx.getTorsoLeanRatio();
+        if (ImGui.SliderFloat("Torso Lean Ratio", _torsoLeanRatio, 0, 2)) {
+            ctx.setTorsoLeanRatio(_torsoLeanRatio[0]);
+        }
+        ImGui.SameLine();
+        ImGui.TextDisabled("(?)");
+        if (ImGui.IsItemHovered()) {
+            ImGui.SetTooltip("Ratio of camera lean applied to the clone's spine (0.6 = 60% of camera angle)");
         }
     }
 
