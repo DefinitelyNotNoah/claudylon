@@ -7,7 +7,7 @@
 
 import { Scene } from "@babylonjs/core/scene";
 import { Observer } from "@babylonjs/core/Misc/observable";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { PLAYER_STATS } from "../../shared/constants/PlayerConstants";
 import { RemotePlayer } from "../network/RemotePlayer";
@@ -289,8 +289,13 @@ export class MirrorClone {
             if (!this._spineBoneNode) return;
         }
 
-        // Additively rotate the spine bone in its local Z axis (lean)
-        this._spineBoneNode.rotation.z += this._pendingLeanAngle;
+        // Bone TransformNodes use rotationQuaternion (set by animation system).
+        // Multiply a local Z-axis rotation onto the existing animation pose.
+        const q = this._spineBoneNode.rotationQuaternion;
+        if (q) {
+            const leanQ = Quaternion.RotationAxis(Vector3.Forward(), this._pendingLeanAngle);
+            this._spineBoneNode.rotationQuaternion = q.multiply(leanQ);
+        }
     }
 
     /**
