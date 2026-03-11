@@ -1,5 +1,5 @@
-> Before making any decisions or writing any code, always read TODO.md and README.md in full first.
-> After completing any plan implementation, always commit all changes and push to origin.
+> Before making any decisions or writing any code, always read TODO.md, README.md, and this file (CLAUDE.md) in full first.
+> After completing any task, always update TODO.md and CLAUDE.md, then commit all changes and push to origin.
 
 ## MANDATORY: Documentation Updates
 
