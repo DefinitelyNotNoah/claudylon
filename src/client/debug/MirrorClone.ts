@@ -50,7 +50,16 @@ export class MirrorClone {
     private _lastWeaponId: string = "";
 
     /** How much of the camera lean angle to apply to the torso (0-2). */
-    private _torsoLeanRatio: number = 1.0;
+    private _torsoLeanRatio: number = 1.45;
+
+    /** Model's own max lean angle in radians (default 30 degrees). */
+    private _modelMaxLeanAngle: number = 0.524;
+
+    /** Model's lean speed (per second). */
+    private _modelLeanSpeed: number = 8.0;
+
+    /** Model's horizontal lean offset (cm) — currently visual only via torso bones. */
+    private _modelLeanOffset: number = 30;
 
     /** Cached spine bone TransformNodes for lean rotation. */
     private _spineBoneNodes: TransformNode[] = [];
@@ -145,13 +154,40 @@ export class MirrorClone {
         this._lockedPitch = value;
     }
 
-    /** How much of the camera lean angle to apply to the torso (0-1). */
+    /** How much of the camera lean angle to apply to the torso (0-2). */
     public get torsoLeanRatio(): number {
         return this._torsoLeanRatio;
     }
 
     public set torsoLeanRatio(value: number) {
         this._torsoLeanRatio = Math.max(0, Math.min(2, value));
+    }
+
+    /** Model's own max lean angle in radians (separate from POV). */
+    public get modelMaxLeanAngle(): number {
+        return this._modelMaxLeanAngle;
+    }
+
+    public set modelMaxLeanAngle(value: number) {
+        this._modelMaxLeanAngle = value;
+    }
+
+    /** Model's lean speed (per second). */
+    public get modelLeanSpeed(): number {
+        return this._modelLeanSpeed;
+    }
+
+    public set modelLeanSpeed(value: number) {
+        this._modelLeanSpeed = value;
+    }
+
+    /** Model's horizontal lean offset (cm). */
+    public get modelLeanOffset(): number {
+        return this._modelLeanOffset;
+    }
+
+    public set modelLeanOffset(value: number) {
+        this._modelLeanOffset = value;
     }
 
     /**
@@ -260,9 +296,10 @@ export class MirrorClone {
         this._remote.update(dt);
 
         // Store lean angle — applied after animation evaluation via observer.
-        // Scale the camera lean by torsoLeanRatio for the third-person model.
+        // Use the model's own maxLeanAngle (independent from POV camera lean)
+        // and scale by torsoLeanRatio for tuning.
         const leanAmount = this._playerController.leanAmount;
-        const maxAngle = this._playerController.maxLeanAngle * this._torsoLeanRatio;
+        const maxAngle = this._modelMaxLeanAngle * this._torsoLeanRatio;
         this._pendingLeanAngle = -leanAmount * maxAngle;
 
         this._lastWeaponId = weaponId;

@@ -2940,19 +2940,33 @@ export class MatchScene extends GameScene {
                 if (this._mirrorClone) this._mirrorClone.lockedPitch = v;
             },
             getLeanAmount: () => this._playerController?.leanAmount ?? 0,
-            getMaxLeanAngle: () => this._playerController?.maxLeanAngle ?? 0.26,
-            setMaxLeanAngle: (v) => {
+            // POV (camera) lean parameters
+            getPovMaxLeanAngle: () => this._playerController?.maxLeanAngle ?? 0.1745,
+            setPovMaxLeanAngle: (v) => {
                 if (this._playerController) this._playerController.maxLeanAngle = v;
             },
-            getLeanSpeed: () => this._playerController?.leanSpeed ?? 8,
-            setLeanSpeed: (v) => {
+            getPovLeanSpeed: () => this._playerController?.leanSpeed ?? 8,
+            setPovLeanSpeed: (v) => {
                 if (this._playerController) this._playerController.leanSpeed = v;
             },
-            getLeanOffset: () => this._playerController?.leanOffset ?? 30,
-            setLeanOffset: (v) => {
+            getPovLeanOffset: () => this._playerController?.leanOffset ?? 50,
+            setPovLeanOffset: (v) => {
                 if (this._playerController) this._playerController.leanOffset = v;
             },
-            getTorsoLeanRatio: () => this._mirrorClone?.torsoLeanRatio ?? 0.6,
+            // Model (3rd-person) lean parameters
+            getModelMaxLeanAngle: () => this._mirrorClone?.modelMaxLeanAngle ?? 0.524,
+            setModelMaxLeanAngle: (v) => {
+                if (this._mirrorClone) this._mirrorClone.modelMaxLeanAngle = v;
+            },
+            getModelLeanSpeed: () => this._mirrorClone?.modelLeanSpeed ?? 8,
+            setModelLeanSpeed: (v) => {
+                if (this._mirrorClone) this._mirrorClone.modelLeanSpeed = v;
+            },
+            getModelLeanOffset: () => this._mirrorClone?.modelLeanOffset ?? 30,
+            setModelLeanOffset: (v) => {
+                if (this._mirrorClone) this._mirrorClone.modelLeanOffset = v;
+            },
+            getTorsoLeanRatio: () => this._mirrorClone?.torsoLeanRatio ?? 1.45,
             setTorsoLeanRatio: (v) => {
                 if (this._mirrorClone) this._mirrorClone.torsoLeanRatio = v;
             },

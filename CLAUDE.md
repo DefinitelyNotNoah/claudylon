@@ -120,10 +120,9 @@
 ### Leaning System
 - **Keys:** Q (lean left), E (lean right) — hold to lean, release to return upright
 - **Camera:** Quaternion-based rotation (`Yaw * Pitch * Roll`) to avoid gimbal lock — Euler rotation with non-zero roll causes axis coupling
-- **Parameters (all tunable via Mirror ImGui tab):**
-  - `maxLeanAngle` — camera roll angle in radians (default 30 degrees / 0.524 rad)
-  - `leanSpeed` — interpolation speed (default 8.0/s)
-  - `leanOffset` — horizontal camera shift in cm (default 30cm)
+- **Separate POV vs Model parameters (tunable via Mirror ImGui tab):**
+  - **POV (camera):** `maxLeanAngle` 10° (0.1745 rad), `leanSpeed` 8/s, `leanOffset` 50cm
+  - **Model (3rd person):** `modelMaxLeanAngle` 30° (0.524 rad), `modelLeanSpeed` 8/s, `modelLeanOffset` 30cm, `torsoLeanRatio` 1.45
 - **Viewmodel:** WeaponSway receives `leanAmount` param, applies sideways shift (3.0 units) + tilt (0.08 rad)
 - **Interact key:** F (not E, which is lean right)
 
@@ -132,5 +131,5 @@
 - **Features:** Position tracking, weapon sync, fire sync (recoil + spatial audio), torso lean
 - **Lean sync:** Uses `onAfterAnimationsObservable` to apply quaternion rotation to spine bones (Spine, Spine1, Spine2) AFTER animation evaluation — prevents animations from overwriting
 - **Lean axis:** Derived from Head bone's world-space forward direction (horizontal projection), transformed into each spine bone's parent local space — accounts for animation pose offset (gun-holding stance)
-- **Torso lean ratio:** Scales camera lean for third-person model (default 1.0 = 100%, tunable 0-2x)
-- **ImGui tab:** `src/client/ui/imgui/MirrorTab.ts` — spawn/despawn, offset distance, collision toggle, rotation lock, leaning params, torso lean ratio
+- **Model lean:** Own `modelMaxLeanAngle` (30°) independent of POV camera angle, scaled by `torsoLeanRatio` (default 1.45)
+- **ImGui tab:** `src/client/ui/imgui/MirrorTab.ts` — spawn/despawn, offset distance, collision toggle, rotation lock, separate POV + Model leaning sections

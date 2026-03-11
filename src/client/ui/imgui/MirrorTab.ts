@@ -27,12 +27,20 @@ export interface MirrorTabContext {
     getLockedPitch: () => number;
     setLockedPitch: (v: number) => void;
     getLeanAmount: () => number;
-    getMaxLeanAngle: () => number;
-    setMaxLeanAngle: (v: number) => void;
-    getLeanSpeed: () => number;
-    setLeanSpeed: (v: number) => void;
-    getLeanOffset: () => number;
-    setLeanOffset: (v: number) => void;
+    /** POV (camera) lean parameters */
+    getPovMaxLeanAngle: () => number;
+    setPovMaxLeanAngle: (v: number) => void;
+    getPovLeanSpeed: () => number;
+    setPovLeanSpeed: (v: number) => void;
+    getPovLeanOffset: () => number;
+    setPovLeanOffset: (v: number) => void;
+    /** Model (3rd-person) lean parameters */
+    getModelMaxLeanAngle: () => number;
+    setModelMaxLeanAngle: (v: number) => void;
+    getModelLeanSpeed: () => number;
+    setModelLeanSpeed: (v: number) => void;
+    getModelLeanOffset: () => number;
+    setModelLeanOffset: (v: number) => void;
     getTorsoLeanRatio: () => number;
     setTorsoLeanRatio: (v: number) => void;
 }
@@ -43,10 +51,15 @@ const _collisionEnabled: [boolean] = [false];
 const _rotationLocked: [boolean] = [false];
 const _lockedYawDeg: [number] = [0];
 const _lockedPitchDeg: [number] = [0];
-const _maxLeanAngleDeg: [number] = [15];
-const _leanSpeed: [number] = [8];
-const _leanOffset: [number] = [30];
-const _torsoLeanRatio: [number] = [0.6];
+// POV lean refs
+const _povMaxLeanAngleDeg: [number] = [10];
+const _povLeanSpeed: [number] = [8];
+const _povLeanOffset: [number] = [50];
+// Model lean refs
+const _modelMaxLeanAngleDeg: [number] = [30];
+const _modelLeanSpeed: [number] = [8];
+const _modelLeanOffset: [number] = [30];
+const _torsoLeanRatio: [number] = [1.45];
 
 /**
  * Draws the Mirror tab content (no Begin/End window — caller manages that).
@@ -97,24 +110,42 @@ export function drawMirrorTab(ctx: MirrorTabContext): void {
         ImGui.ProgressBar((leanAmount + 1) / 2, { x: -1, y: 0 }, `${(leanAmount * 100).toFixed(0)}%`);
 
         ImGui.Spacing();
+        ImGui.TextDisabled("POV (Camera)");
 
-        _maxLeanAngleDeg[0] = ctx.getMaxLeanAngle() * (180 / Math.PI);
-        if (ImGui.SliderFloat("Max Lean Angle (deg)", _maxLeanAngleDeg, 1, 45)) {
-            ctx.setMaxLeanAngle(_maxLeanAngleDeg[0] * (Math.PI / 180));
+        _povMaxLeanAngleDeg[0] = ctx.getPovMaxLeanAngle() * (180 / Math.PI);
+        if (ImGui.SliderFloat("POV Max Angle (deg)", _povMaxLeanAngleDeg, 1, 45)) {
+            ctx.setPovMaxLeanAngle(_povMaxLeanAngleDeg[0] * (Math.PI / 180));
         }
 
-        _leanSpeed[0] = ctx.getLeanSpeed();
-        if (ImGui.SliderFloat("Lean Speed", _leanSpeed, 1, 20)) {
-            ctx.setLeanSpeed(_leanSpeed[0]);
+        _povLeanSpeed[0] = ctx.getPovLeanSpeed();
+        if (ImGui.SliderFloat("POV Lean Speed", _povLeanSpeed, 1, 20)) {
+            ctx.setPovLeanSpeed(_povLeanSpeed[0]);
         }
 
-        _leanOffset[0] = ctx.getLeanOffset();
-        if (ImGui.SliderFloat("Lean Offset (cm)", _leanOffset, 0, 80)) {
-            ctx.setLeanOffset(_leanOffset[0]);
+        _povLeanOffset[0] = ctx.getPovLeanOffset();
+        if (ImGui.SliderFloat("POV Lean Offset (cm)", _povLeanOffset, 0, 80)) {
+            ctx.setPovLeanOffset(_povLeanOffset[0]);
         }
 
         ImGui.Spacing();
-        ImGui.TextDisabled("Clone Torso");
+        ImGui.TextDisabled("Model (3rd Person)");
+
+        _modelMaxLeanAngleDeg[0] = ctx.getModelMaxLeanAngle() * (180 / Math.PI);
+        if (ImGui.SliderFloat("Model Max Angle (deg)", _modelMaxLeanAngleDeg, 1, 45)) {
+            ctx.setModelMaxLeanAngle(_modelMaxLeanAngleDeg[0] * (Math.PI / 180));
+        }
+
+        _modelLeanSpeed[0] = ctx.getModelLeanSpeed();
+        if (ImGui.SliderFloat("Model Lean Speed", _modelLeanSpeed, 1, 20)) {
+            ctx.setModelLeanSpeed(_modelLeanSpeed[0]);
+        }
+
+        _modelLeanOffset[0] = ctx.getModelLeanOffset();
+        if (ImGui.SliderFloat("Model Lean Offset (cm)", _modelLeanOffset, 0, 80)) {
+            ctx.setModelLeanOffset(_modelLeanOffset[0]);
+        }
+
+        ImGui.Spacing();
 
         _torsoLeanRatio[0] = ctx.getTorsoLeanRatio();
         if (ImGui.SliderFloat("Torso Lean Ratio", _torsoLeanRatio, 0, 2)) {
@@ -123,7 +154,7 @@ export function drawMirrorTab(ctx: MirrorTabContext): void {
         ImGui.SameLine();
         ImGui.TextDisabled("(?)");
         if (ImGui.IsItemHovered()) {
-            ImGui.SetTooltip("Ratio of camera lean applied to the clone's spine (0.6 = 60% of camera angle)");
+            ImGui.SetTooltip("Multiplier on model lean angle applied to spine bones");
         }
     }
 
