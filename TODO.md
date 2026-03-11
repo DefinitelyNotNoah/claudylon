@@ -265,6 +265,14 @@
 - [x] Lighting and atmosphere improvements for existing maps
     - Shipment: warm NW sun, soft shadows (darkness=0.35), overcast grey-blue sky, light haze fog
     - Playground: bright midday sun from SE, cool sky hemisphere + warm fill, blue sky clearColor, distance fog
+- [x] Fix excessive fog density on both maps (Shipment: 0.00006→0.000008, Playground: 0.000035→0.000005)
+- [x] Add Atmosphere ImGui debug tab (`src/client/ui/imgui/AtmosphereTab.ts`)
+    - Fog: mode combo (None/EXP/Linear/EXP2), density, start/end, color
+    - Directional light: intensity, diffuse color, direction XYZ
+    - Hemispheric light: intensity, sky color, ground color
+    - Sky: clear color RGBA
+    - Shadows: darkness, blur kernel
+    - Wired into MatchScene debug panel tab bar
 
 ### Networking Engineer
 - [x] Audit all gameplay features for multiplayer sync gaps

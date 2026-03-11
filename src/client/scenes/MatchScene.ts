@@ -78,6 +78,8 @@ import { drawPhysicsTab } from "../ui/imgui/PhysicsTab";
 import { drawProgressionTab } from "../ui/imgui/ProgressionTab";
 import { drawPerformanceTab } from "../ui/imgui/PerformanceTab";
 import { drawMirrorTab } from "../ui/imgui/MirrorTab";
+import { drawAtmosphereTab } from "../ui/imgui/AtmosphereTab";
+import type { AtmosphereTabContext } from "../ui/imgui/AtmosphereTab";
 import type { PlayerPanelContext } from "../ui/imgui/PlayerPanel";
 import type { BotPanelContext, BotInfo } from "../ui/imgui/BotPanel";
 import type { WeaponsTabContext } from "../ui/imgui/WeaponsTab";
@@ -387,6 +389,10 @@ export class MatchScene extends GameScene {
             }
             if (ImGui.BeginTabItem("Mirror")) {
                 drawMirrorTab(this._buildMirrorTabContext());
+                ImGui.EndTabItem();
+            }
+            if (ImGui.BeginTabItem("Atmosphere")) {
+                drawAtmosphereTab(this._buildAtmosphereTabContext());
                 ImGui.EndTabItem();
             }
         });
@@ -2757,6 +2763,100 @@ export class MatchScene extends GameScene {
                 (sum, m) => sum + ((m as AbstractMesh).getTotalIndices?.() ?? 0) / 3, 0,
             ),
             getResolution: () => `${engine.getRenderWidth()} x ${engine.getRenderHeight()}`,
+        };
+    }
+
+    /**
+     * Builds context for the Atmosphere ImGui tab.
+     * Accesses fog, lights, shadow generator, and clear color from the live scene.
+     */
+    private _buildAtmosphereTabContext(): AtmosphereTabContext {
+        const scene = this._scene;
+        const sg = this._shadowGenerator;
+
+        /** Returns the first DirectionalLight in the scene, or null. */
+        const dirLight = () => {
+            for (const l of scene.lights) {
+                if (l.getClassName() === "DirectionalLight") return l as import("@babylonjs/core/Lights/directionalLight").DirectionalLight;
+            }
+            return null;
+        };
+
+        /** Returns the first HemisphericLight in the scene, or null. */
+        const hemiLight = () => {
+            for (const l of scene.lights) {
+                if (l.getClassName() === "HemisphericLight") return l as import("@babylonjs/core/Lights/hemisphericLight").HemisphericLight;
+            }
+            return null;
+        };
+
+        return {
+            // ── Fog ──────────────────────────────────────────────────────────
+            getFogMode: () => scene.fogMode,
+            setFogMode: (mode) => { scene.fogMode = mode; },
+            getFogDensity: () => scene.fogDensity,
+            setFogDensity: (v) => { scene.fogDensity = v; },
+            getFogStart: () => scene.fogStart,
+            setFogStart: (v) => { scene.fogStart = v; },
+            getFogEnd: () => scene.fogEnd,
+            setFogEnd: (v) => { scene.fogEnd = v; },
+            getFogColor: () => [scene.fogColor.r, scene.fogColor.g, scene.fogColor.b],
+            setFogColor: (r, g, b) => { scene.fogColor.r = r; scene.fogColor.g = g; scene.fogColor.b = b; },
+
+            // ── Directional Light ─────────────────────────────────────────────
+            getDirLightIntensity: () => dirLight()?.intensity ?? 1,
+            setDirLightIntensity: (v) => { const l = dirLight(); if (l) l.intensity = v; },
+            getDirLightColor: () => {
+                const l = dirLight();
+                return l ? [l.diffuse.r, l.diffuse.g, l.diffuse.b] as [number, number, number] : [1, 1, 1];
+            },
+            setDirLightColor: (r, g, b) => {
+                const l = dirLight();
+                if (l) { l.diffuse.r = r; l.diffuse.g = g; l.diffuse.b = b; }
+            },
+            getDirLightDirection: () => {
+                const l = dirLight();
+                return l ? [l.direction.x, l.direction.y, l.direction.z] as [number, number, number] : [0, -1, 0];
+            },
+            setDirLightDirection: (x, y, z) => {
+                const l = dirLight();
+                if (l) { l.direction.x = x; l.direction.y = y; l.direction.z = z; }
+            },
+
+            // ── Hemispheric Light ─────────────────────────────────────────────
+            getHemiIntensity: () => hemiLight()?.intensity ?? 0.5,
+            setHemiIntensity: (v) => { const h = hemiLight(); if (h) h.intensity = v; },
+            getHemiDiffuse: () => {
+                const h = hemiLight();
+                return h ? [h.diffuse.r, h.diffuse.g, h.diffuse.b] as [number, number, number] : [1, 1, 1];
+            },
+            setHemiDiffuse: (r, g, b) => {
+                const h = hemiLight();
+                if (h) { h.diffuse.r = r; h.diffuse.g = g; h.diffuse.b = b; }
+            },
+            getHemiGroundColor: () => {
+                const h = hemiLight();
+                return h ? [h.groundColor.r, h.groundColor.g, h.groundColor.b] as [number, number, number] : [0.3, 0.3, 0.3];
+            },
+            setHemiGroundColor: (r, g, b) => {
+                const h = hemiLight();
+                if (h) { h.groundColor.r = r; h.groundColor.g = g; h.groundColor.b = b; }
+            },
+
+            // ── Sky / Clear Color ─────────────────────────────────────────────
+            getClearColor: () => [scene.clearColor.r, scene.clearColor.g, scene.clearColor.b, scene.clearColor.a],
+            setClearColor: (r, g, b, a) => {
+                scene.clearColor.r = r;
+                scene.clearColor.g = g;
+                scene.clearColor.b = b;
+                scene.clearColor.a = a;
+            },
+
+            // ── Shadows ───────────────────────────────────────────────────────
+            getShadowDarkness: () => sg?.darkness ?? 0.35,
+            setShadowDarkness: (v) => { if (sg) sg.darkness = v; },
+            getShadowBlurKernel: () => sg?.blurKernel ?? 24,
+            setShadowBlurKernel: (v) => { if (sg) sg.blurKernel = v; },
         };
     }
 

@@ -17,7 +17,7 @@ import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType } from "@babylonjs/core/Physics/v2/IPhysicsEnginePlugin";
 import { ImportMeshAsync } from "@babylonjs/core/Loading/sceneLoader";
 import { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
-import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 
 import "@babylonjs/core/Meshes/Builders/groundBuilder";
@@ -66,30 +66,55 @@ export class PlaygroundMap extends MapBuilder {
     }
 
     /**
-     * Sets up bright lighting suited to an outdoor test environment.
-     * Stronger ambient and directional than Shipment.
+     * Sets up bright outdoor lighting with a blue-sky atmosphere.
+     * Includes warm-tinted directional sun, cool sky bounce, distance fog,
+     * and a clear-sky background color.
      */
     private _setupLighting(): void {
+        // Sky-blue clear background
+        this._scene.clearColor = new Color4(0.52, 0.73, 0.92, 1.0);
+
+        // Primary sky hemisphere — bright, slightly cool sky blue at top,
+        // warm dusty bounce from ground.
         const hemi = new HemisphericLight(
             "light_hemispheric_1",
             new Vector3(0, 1, 0),
             this._scene
         );
-        hemi.intensity = 0.9;
-        hemi.diffuse = new Color3(1.0, 1.0, 1.0);
-        hemi.groundColor = new Color3(0.4, 0.4, 0.4);
+        hemi.intensity = 0.75;
+        hemi.diffuse = new Color3(0.85, 0.92, 1.0);      // cool sky fill
+        hemi.groundColor = new Color3(0.50, 0.45, 0.35); // warm sandy ground bounce
 
+        // Directional sun from the south-east — clean midday angle
         const sun = new DirectionalLight(
             "light_directional_1",
-            new Vector3(-1, -2, -0.5).normalize(),
+            new Vector3(0.5, -1.8, 0.3).normalize(),
             this._scene
         );
-        sun.position = new Vector3(2000, 3000, 2000);
-        sun.intensity = 1.1;
+        sun.position = new Vector3(-2000, 4000, -1500);
+        sun.intensity = 1.2;
+        sun.diffuse = new Color3(1.0, 0.96, 0.82);   // warm yellow sun
+        sun.specular = new Color3(0.6, 0.58, 0.45);
+
+        // Secondary fill light from the opposite side — softens harsh shadows
+        const fill = new DirectionalLight(
+            "light_fill_1",
+            new Vector3(-0.3, -0.5, -0.2).normalize(),
+            this._scene
+        );
+        fill.intensity = 0.25;
+        fill.diffuse = new Color3(0.7, 0.80, 1.0);  // cool blue sky fill
+        fill.specular = new Color3(0, 0, 0);
 
         this._shadowGenerator = new ShadowGenerator(2048, sun);
         this._shadowGenerator.useBlurExponentialShadowMap = true;
-        this._shadowGenerator.blurKernel = 16;
+        this._shadowGenerator.blurKernel = 24;
+        this._shadowGenerator.darkness = 0.3;
+
+        // Very subtle atmospheric haze — barely perceptible at distance, full visibility in-lane
+        this._scene.fogMode = 3; // FOGMODE_EXP2
+        this._scene.fogDensity = 0.000005;
+        this._scene.fogColor = new Color3(0.72, 0.84, 0.95);
     }
 
     /**

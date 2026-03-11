@@ -139,7 +139,7 @@ This project uses **Claude Code Agent Teams** for parallel development. Opus is 
 - **Package:** `@mori2003/jsimgui` v0.13.0 — Dear ImGui JS bindings, WebGL2 canvas overlay
 - **Architecture:** Separate `<canvas>` at z-index 100 with `pointer-events: none`; document-level mouse/keyboard listeners feed ImGui IO directly
 - **Tab modules:** `src/client/ui/imgui/` — each tab is a standalone draw function with a context interface
-- **Tabs:** Player, Bots, Weapons, Audio, Graphics, Physics, Progression, Performance, Mirror, Settings
+- **Tabs:** Player, Bots, Weapons, Audio, Graphics, Physics, Progression, Performance, Mirror, Atmosphere, Settings
 - **Adding a tab:** Create `src/client/ui/imgui/MyTab.ts` with context interface + `drawMyTab(ctx)`, wire in MatchScene draw callback
 
 ### Networking (Colyseus 0.17)
