@@ -59,6 +59,9 @@ import { PlayerStateEnum } from "../../shared/types";
 import type { WeaponId, FireEventData } from "../../shared/types";
 import { PLAYER_STATS, MASTER_VOLUME_KEY, DEFAULT_MASTER_VOLUME } from "../../shared/constants/PlayerConstants";
 import { MATCH_DURATION_S, SHIPMENT_SPAWN_POINTS } from "../../shared/constants/MapConstants";
+import { SELECTED_MAP_KEY, DEFAULT_MAP_ID } from "../../shared/constants/MapRegistry";
+import type { MapId } from "../../shared/constants/MapRegistry";
+import { createMapBuilder } from "../maps/MapFactory";
 import {
     BOT_COUNT_KEY,
     BOT_DIFFICULTY_KEY,
@@ -94,28 +97,10 @@ import type { MirrorTabContext } from "../ui/imgui/MirrorTab";
 import { MirrorClone } from "../debug/MirrorClone";
 import { PROJECTILE_LIFETIME, setProjectileLifetime } from "../weapons/Projectile";
 import { WEAPON_UNLOCK_REQUIREMENTS } from "../../shared/constants/WeaponConstants";
+import { JumpSmokeEffect } from "../vfx/JumpSmokeEffect";
 
 /** Gravity vector: 981 cm/s² downward. */
 const GRAVITY = new Vector3(0, -981, 0);
-
-/** Map dimensions in cm (30m x 30m). */
-const MAP_SIZE = 3000;
-
-/** Wall height in cm (4m). */
-const WALL_HEIGHT = 400;
-
-/** Wall thickness in cm. */
-const WALL_THICKNESS = 20;
-
-/**
- * Placement data for a prop instance.
- */
-interface PropPlacement {
-    /** World-space position. */
-    pos: Vector3;
-    /** Y-axis rotation in radians. */
-    rotY: number;
-}
 
 /**
  * The main gameplay scene. Builds the Shipment-inspired map,
@@ -175,6 +160,16 @@ export class MatchScene extends GameScene {
     // ─── Mirror Clone ─────────────────────────────────────────────
     private _mirrorClone: MirrorClone | null = null;
 
+    // ─── VFX ──────────────────────────────────────────────────────
+    /** Smoke puff effect for the local player's jump. */
+    private _localJumpSmoke: JumpSmokeEffect | null = null;
+    /** Smoke puff effects keyed by bot sessionId. */
+    private _botJumpSmokes: Map<string, JumpSmokeEffect> = new Map();
+    /** Previous player state for jump-transition detection. */
+    private _prevPlayerState: PlayerStateEnum = PlayerStateEnum.Idle;
+    /** Previous bot states for jump-transition detection, keyed by sessionId. */
+    private _prevBotStates: Map<string, PlayerStateEnum> = new Map();
+
     // ─── Developer Console ────────────────────────────────────────
     private _consoleUI: DeveloperConsoleUI | null = null;
     private _consoleRegistry: ConsoleCommandRegistry | null = null;
@@ -208,12 +203,11 @@ export class MatchScene extends GameScene {
 
         this._scene.clearColor = new Color4(0.53, 0.81, 0.92, 1.0);
 
-        this._buildGround();
-        this._buildWalls();
-        this._setupLighting();
-        const spawnPoints = this._createSpawnPoints();
-
-        await this._loadProps();
+        // Build the selected map
+        const mapId = (localStorage.getItem(SELECTED_MAP_KEY) ?? DEFAULT_MAP_ID) as MapId;
+        const mapBuilder = createMapBuilder(mapId, this._scene);
+        const { spawnPoints, shadowGenerator } = await mapBuilder.build();
+        this._shadowGenerator = shadowGenerator;
 
         this._inputManager = new InputManager(this._manager.canvas);
 
@@ -251,6 +245,8 @@ export class MatchScene extends GameScene {
         );
 
         this._weaponSway = new WeaponSway(this._playerController.viewmodelAnchor);
+
+        this._localJumpSmoke = new JumpSmokeEffect(this._scene);
 
         this._crosshairHUD = new CrosshairHUD(this._scene);
         this._hitIndicator = new HitIndicator(this._scene);
@@ -608,6 +604,9 @@ export class MatchScene extends GameScene {
 
                 // Mirror clone tracks player state
                 this._mirrorClone?.update(dt);
+
+                // Jump smoke VFX
+                this._updateJumpSmoke();
             }
 
             // Minimap update (runs even when paused)
@@ -943,6 +942,7 @@ export class MatchScene extends GameScene {
                         player.health,
                         player.state,
                         player.weaponId,
+                        player.leanAmount ?? 0,
                     );
                 });
             }
@@ -1374,6 +1374,51 @@ export class MatchScene extends GameScene {
     }
 
     /**
+     * Detects jump-state transitions for the local player and all bots,
+     * triggering a cartoon smoke puff at their feet when they leave the ground.
+     */
+    private _updateJumpSmoke(): void {
+        // Local player
+        if (this._playerController && this._localJumpSmoke) {
+            const currentState = this._playerController.state;
+            if (
+                this._prevPlayerState !== PlayerStateEnum.Jumping &&
+                currentState === PlayerStateEnum.Jumping
+            ) {
+                const pos = this._playerController.position.clone();
+                pos.y += 2; // slightly above ground to avoid z-fighting
+                this._localJumpSmoke.play(pos);
+            }
+            this._prevPlayerState = currentState;
+        }
+
+        // Bots (offline mode)
+        if (this._botManager) {
+            for (const bot of this._botManager.bots) {
+                const sid = bot.sessionId;
+                const currentState = bot.state;
+                const prevState = this._prevBotStates.get(sid) ?? PlayerStateEnum.Idle;
+
+                if (
+                    prevState !== PlayerStateEnum.Jumping &&
+                    currentState === PlayerStateEnum.Jumping
+                ) {
+                    // Lazily create a smoke effect for this bot on first jump
+                    if (!this._botJumpSmokes.has(sid)) {
+                        this._botJumpSmokes.set(sid, new JumpSmokeEffect(this._scene));
+                    }
+                    const smokeEffect = this._botJumpSmokes.get(sid)!;
+                    const pos = bot.position.clone();
+                    pos.y += 2;
+                    smokeEffect.play(pos);
+                }
+
+                this._prevBotStates.set(sid, currentState);
+            }
+        }
+    }
+
+    /**
      * Gathers bot and remote player positions and updates the minimap.
      */
     private _updateMinimap(): void {
@@ -1471,6 +1516,7 @@ export class MatchScene extends GameScene {
             weaponId: weapon.id,
             currentAmmo: weapon.currentAmmo,
             reserveAmmo: weapon.reserveAmmo,
+            leanAmount: this._playerController.leanAmount,
         });
     }
 
@@ -3031,6 +3077,11 @@ export class MatchScene extends GameScene {
         this._debugCapsuleMaterials = [];
         this._debugCapsuleOriginalState.clear();
         this._mirrorClone?.dispose();
+        this._localJumpSmoke?.dispose();
+        for (const smoke of this._botJumpSmokes.values()) {
+            smoke.dispose();
+        }
+        this._botJumpSmokes.clear();
         this._debugNavMesh?.dispose();
         this._weaponDropManager?.dispose();
         this._botManager?.dispose();

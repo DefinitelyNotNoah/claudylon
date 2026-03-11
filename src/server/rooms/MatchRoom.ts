@@ -84,6 +84,7 @@ export class MatchRoom extends Room<MatchState> {
         player.weaponId = options?.weaponId || "usp";
         player.kills = 0;
         player.deaths = 0;
+        player.leanAmount = 0;
 
         const weaponStats = WEAPON_STATS[player.weaponId as WeaponId];
         if (weaponStats) {
@@ -137,6 +138,7 @@ export class MatchRoom extends Room<MatchState> {
             player.weaponId = data.weaponId as string;
             player.currentAmmo = data.currentAmmo;
             player.reserveAmmo = data.reserveAmmo;
+            player.leanAmount = data.leanAmount ?? 0;
         },
 
         /**

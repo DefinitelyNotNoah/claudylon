@@ -139,6 +139,7 @@ This project uses **Claude Code Agent Teams** for parallel development. Opus is 
 - **Hit detection:** Client-side raycast → `hit_claim` → server validates → `hit_confirmed`
 - **Schema:** `@type()` decorated fields MUST use `declare` keyword (prevents field initializer overwrite)
 - **Optional:** MatchScene checks `NetworkManager.isInMatch`, offline works without server
+- **Lean sync (implemented):** `leanAmount` (-1..1) is in `PlayerSchema` (`@type("float32") declare leanAmount`), `PlayerUpdateData`, sent every network tick from `_sendNetworkUpdate`, applied to remote players via `RemotePlayer._applyTorsoLean()` using `onAfterAnimationsObservable` — same bone-rotation technique as MirrorClone
 
 ### Progression
 - **Max level:** 30, XP formula: `100 * (level + 1)^1.5` per level

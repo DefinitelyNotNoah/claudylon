@@ -146,6 +146,8 @@ export interface PlayerUpdateData {
     currentAmmo: number;
     /** Total reserve rounds. */
     reserveAmmo: number;
+    /** Lean amount (-1 = full left, 0 = upright, 1 = full right). */
+    leanAmount: number;
 }
 
 /** Data sent with a fire message (client → server). */

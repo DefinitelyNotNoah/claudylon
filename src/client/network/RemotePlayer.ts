@@ -7,7 +7,7 @@
  */
 
 import { Scene } from "@babylonjs/core/scene";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
@@ -15,6 +15,7 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { ImportMeshAsync } from "@babylonjs/core/Loading/sceneLoader";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import type { Observer } from "@babylonjs/core/Misc/observable";
 import { PLAYER_STATS } from "../../shared/constants/PlayerConstants.js";
 import { WEAPON_STATS } from "../../shared/constants/WeaponConstants.js";
 import type { WeaponId } from "../../shared/types/index.js";
@@ -54,6 +55,15 @@ const RAGDOLL_SETTLE_TIME = 3.0;
 
 /** Time in seconds to hide body after death animation (fallback, no ragdoll). */
 const DEATH_ANIM_HIDE_TIME = 2.0;
+
+/** Spine bones to distribute lean across (Mixamo naming). */
+const LEAN_BONES = ["mixamorig:Spine", "mixamorig:Spine1", "mixamorig:Spine2"];
+
+/** Maximum torso lean angle in radians (30°). */
+const MODEL_MAX_LEAN_ANGLE = 0.524;
+
+/** Torso lean ratio: scales the received lean amount for visual tuning. */
+const TORSO_LEAN_RATIO = 1.45;
 
 /**
  * Renders a remote player with an animated character model and a
@@ -102,6 +112,12 @@ export class RemotePlayer {
     private _isDead: boolean = false;
     private _deathHideTimer: number = -1;
     private _isDormant: boolean = false;
+
+    // Torso lean (synced from network)
+    private _pendingLeanAngle: number = 0;
+    private _spineBoneNodes: TransformNode[] = [];
+    private _headBoneNode: TransformNode | null = null;
+    private _afterAnimObserver: Observer<Scene> | null = null;
 
     /**
      * Creates a remote player visual.
@@ -229,6 +245,7 @@ export class RemotePlayer {
      * @param health - Current health.
      * @param state - Player state string.
      * @param weaponId - Currently equipped weapon ID.
+     * @param leanAmount - Lean amount (-1 full left, 0 upright, 1 full right).
      */
     public updateFromServer(
         x: number,
@@ -238,6 +255,7 @@ export class RemotePlayer {
         health: number,
         state: string,
         weaponId: string,
+        leanAmount: number = 0,
     ): void {
         this._targetX = x;
         this._targetY = y;
@@ -245,6 +263,9 @@ export class RemotePlayer {
         this._targetYaw = yaw;
         this._health = health;
         this._playerState = state;
+
+        // Store pending lean angle — applied after animations via observer
+        this._pendingLeanAngle = -leanAmount * MODEL_MAX_LEAN_ANGLE * TORSO_LEAN_RATIO;
 
         // Forward state to character model for animation
         if (this._characterModel) {
@@ -494,6 +515,13 @@ export class RemotePlayer {
 
                 this._characterModel = model;
 
+                // Register post-animation observer for torso lean
+                if (!this._afterAnimObserver) {
+                    this._afterAnimObserver = this._scene.onAfterAnimationsObservable.add(() => {
+                        this._applyTorsoLean();
+                    });
+                }
+
                 // Attach weapon anchor to right-hand bone if available
                 const handNode = model.rightHandNode;
                 if (handNode) {
@@ -655,9 +683,78 @@ export class RemotePlayer {
     }
 
     /**
+     * Applies torso lean rotation distributed across spine bones after skeleton
+     * animation evaluation. Uses the same technique as MirrorClone._applyLeanToBone:
+     * derives the lean axis from the Head bone's world-space forward direction and
+     * distributes the angle across Spine, Spine1, Spine2 for a natural curve.
+     */
+    private _applyTorsoLean(): void {
+        if (!this._characterModel || !this._characterModel.skeleton) return;
+        if (Math.abs(this._pendingLeanAngle) < 0.001) return;
+
+        // Lazily find and cache spine + head bone TransformNodes
+        if (this._spineBoneNodes.length === 0) {
+            for (const boneName of LEAN_BONES) {
+                for (const bone of this._characterModel.skeleton.bones) {
+                    if (bone.name === boneName) {
+                        const tn = bone.getTransformNode();
+                        if (tn) this._spineBoneNodes.push(tn);
+                        break;
+                    }
+                }
+            }
+            for (const bone of this._characterModel.skeleton.bones) {
+                if (bone.name === "mixamorig:Head") {
+                    this._headBoneNode = bone.getTransformNode() ?? null;
+                    break;
+                }
+            }
+            if (this._spineBoneNodes.length === 0) return;
+        }
+
+        // Derive lean axis from Head bone world-space forward (row 2 of world matrix)
+        const headNode = this._headBoneNode ?? this._spineBoneNodes[this._spineBoneNodes.length - 1];
+        headNode.computeWorldMatrix(true);
+        const world = headNode.getWorldMatrix();
+        const m = world.m;
+        const headFwd = new Vector3(m[8], 0, m[10]);
+        if (headFwd.lengthSquared() < 0.001) {
+            headFwd.set(0, 0, 1);
+        }
+        headFwd.normalize();
+
+        const perBoneAngle = this._pendingLeanAngle / this._spineBoneNodes.length;
+
+        for (const tn of this._spineBoneNodes) {
+            const q = tn.rotationQuaternion;
+            if (!q) continue;
+
+            // Transform lean axis into this bone's parent local space
+            const parent = tn.parent as TransformNode | null;
+            let leanAxis = headFwd;
+            if (parent) {
+                parent.computeWorldMatrix(true);
+                const parentInv = Matrix.Invert(parent.getWorldMatrix());
+                leanAxis = Vector3.TransformNormal(headFwd, parentInv);
+                leanAxis.normalize();
+            }
+
+            const leanQ = Quaternion.RotationAxis(leanAxis, perBoneAngle);
+            tn.rotationQuaternion = leanQ.multiply(q);
+        }
+    }
+
+    /**
      * Disposes the remote player's meshes, character model, and nodes.
      */
     public dispose(): void {
+        if (this._afterAnimObserver) {
+            this._scene.onAfterAnimationsObservable.remove(this._afterAnimObserver);
+            this._afterAnimObserver = null;
+        }
+        this._spineBoneNodes = [];
+        this._headBoneNode = null;
+
         this._disposeWeaponMeshes();
         this._weaponAnchor.dispose();
 

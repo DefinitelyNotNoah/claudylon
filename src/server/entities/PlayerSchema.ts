@@ -55,4 +55,7 @@ export class PlayerSchema extends Schema {
 
     /** Total deaths this match. */
     @type("int16") declare deaths: number;
+
+    /** Lean amount (-1 = full left, 0 = upright, 1 = full right). */
+    @type("float32") declare leanAmount: number;
 }

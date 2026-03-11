@@ -254,10 +254,10 @@
 - [ ] Lighting and atmosphere improvements
 
 ### Networking Engineer
-- [ ] Audit all gameplay features for multiplayer sync gaps
-- [ ] Ensure leaning state syncs to remote players
+- [x] Audit all gameplay features for multiplayer sync gaps
+- [x] Ensure leaning state syncs to remote players
 - [ ] Ensure weapon switching/reloading syncs correctly
-- [ ] Validate singleplayer mode remains fully unnetworked
+- [x] Validate singleplayer mode remains fully unnetworked
 - [ ] Improve hit validation and anti-cheat measures
 
 ### Animator / VFX Dev
@@ -268,7 +268,7 @@
 - [ ] Polish weapon sway and recoil feel
 
 ### Cross-Team
-- [ ] Coordinate leaning sync (Animator defines visuals → Networking syncs state)
+- [x] Coordinate leaning sync (Animator defines visuals → Networking syncs state)
 - [ ] New maps need networking spawn point support (Map Builder → Networking)
 - [ ] VFX need to play for remote players (Animator → Networking)
 
