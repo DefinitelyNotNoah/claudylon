@@ -17,6 +17,8 @@ import { WeaponViewmodel } from "./WeaponViewmodel";
 import { Projectile, type ProjectileHitInfo } from "./Projectile";
 import { MuzzleFlash } from "./MuzzleFlash";
 import { ImpactMarkManager } from "./ImpactMark";
+import { BulletSparkEffect } from "../vfx/BulletSparkEffect";
+import { BloodSplatterEffect } from "../vfx/BloodSplatterEffect";
 
 /** Forward offset from camera for projectile spawn to avoid self-collision (cm). */
 const PROJECTILE_SPAWN_OFFSET = 50;
@@ -37,6 +39,8 @@ export class WeaponManager {
     private _isSwitching: boolean = false;
     private _muzzleFlash: MuzzleFlash;
     private _impactMarks: ImpactMarkManager;
+    private _bulletSpark: BulletSparkEffect;
+    private _bloodSplatter: BloodSplatterEffect;
     /** Cooldown to prevent spamming the empty click sound (seconds). */
     private _emptyClickCooldown: number = 0;
     /** Pending sniper lever sound delay timer (-1 = inactive). */
@@ -70,8 +74,10 @@ export class WeaponManager {
         this._audio = audio;
         this._slot1 = new Weapon(WEAPON_STATS[slot1WeaponId]);
         this._slot2 = new Weapon(WEAPON_STATS[slot2WeaponId]);
-        this._muzzleFlash = new MuzzleFlash(scene, viewmodel.muzzleNode);
+        this._muzzleFlash = new MuzzleFlash(scene, viewmodel.muzzleNode, WEAPON_STATS[slot1WeaponId].category);
         this._impactMarks = new ImpactMarkManager(scene);
+        this._bulletSpark = new BulletSparkEffect(scene);
+        this._bloodSplatter = new BloodSplatterEffect(scene);
     }
 
     /** The currently active weapon. */
@@ -159,6 +165,7 @@ export class WeaponManager {
     public update(dt: number, input: InputManager, camera: FreeCamera): void {
         this._handleWeaponSwitch(input);
 
+        this._muzzleFlash.update(dt);
         this._viewmodel.update(dt);
 
         const weapon = this.activeWeapon;
@@ -225,6 +232,7 @@ export class WeaponManager {
 
         const weapon = this.activeWeapon;
         await this._viewmodel.loadWeapon(weapon.id);
+        this._muzzleFlash.setCategory(weapon.stats.category);
 
         this._isSwitching = false;
     }
@@ -316,8 +324,13 @@ export class WeaponManager {
             if (expired) {
                 const hit = proj.hitInfo;
                 if (hit) {
-                    // Skip impact marks on player/bot meshes
-                    if (!hit.hitMeshName.startsWith("remote_body_")) {
+                    const isCharacterHit = hit.hitMeshName.startsWith("remote_body_");
+                    if (isCharacterHit) {
+                        /* Blood splatter on player/bot body hits. */
+                        this._bloodSplatter.play(hit.position);
+                    } else {
+                        /* Sparks + decal on hard surface hits. */
+                        this._bulletSpark.play(hit.position, hit.normal);
                         this._impactMarks.addMark(hit.position, hit.normal);
                     }
                     this.onProjectileHit?.(hit, proj.damage, this.activeWeapon.id);
@@ -343,5 +356,7 @@ export class WeaponManager {
         this._projectiles = [];
         this._muzzleFlash.dispose();
         this._impactMarks.dispose();
+        this._bulletSpark.dispose();
+        this._bloodSplatter.dispose();
     }
 }

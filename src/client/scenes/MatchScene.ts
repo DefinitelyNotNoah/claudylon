@@ -1306,6 +1306,8 @@ export class MatchScene extends GameScene {
     /**
      * Sends the local player's position, rotation, and state to the server.
      * Throttling is handled by NetworkManager.sendPlayerUpdate().
+     * The effective state prioritizes weapon Reloading over movement state
+     * so remote players can render the reload animation correctly.
      */
     private _sendNetworkUpdate(): void {
         if (!this._playerController || !this._weaponManager) return;
@@ -1314,13 +1316,19 @@ export class MatchScene extends GameScene {
         const groundY = controllerPos.y - PLAYER_STATS.capsuleHeight / 2;
         const weapon = this._weaponManager.activeWeapon;
 
+        // Override movement state with Reloading when weapon is reloading,
+        // so remote players can display the correct animation.
+        const effectiveState = weapon.isReloading
+            ? PlayerStateEnum.Reloading
+            : this._playerController.state;
+
         NetworkManager.getInstance().sendPlayerUpdate({
             x: controllerPos.x,
             y: groundY,
             z: controllerPos.z,
             yaw: this._playerController.yaw,
             pitch: this._playerController.pitch,
-            state: this._playerController.state,
+            state: effectiveState,
             weaponId: weapon.id,
             currentAmmo: weapon.currentAmmo,
             reserveAmmo: weapon.reserveAmmo,
@@ -2465,7 +2473,7 @@ export class MatchScene extends GameScene {
         }
 
         if (this._weaponSway) {
-            this._weaponSway.update(dt, this._playerController.state, this._playerController.verticalVelocity, this._playerController.leanAmount);
+            this._weaponSway.update(dt, this._playerController.state, this._playerController.verticalVelocity, this._playerController.leanAmount, this._playerController.camera);
         }
 
         const weapon = this._weaponManager.activeWeapon;

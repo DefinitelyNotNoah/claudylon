@@ -104,6 +104,10 @@ This project uses **Claude Code Agent Teams** for parallel development. Opus is 
 - Shipment map: 3000×3000 cm. Playground map: 5000×5000 cm
 - GLB models authored in meters should be scaled by 100
 
+### Map Layouts (Current)
+- **Shipment:** Container rows at Z=±750 (6 containers each, E-W aligned) + mid row at Z=0 (4 containers, N-S perpendicular). Stacked containers at NW (Z=+750) and SE (Z=-750) for elevated positions. Jeeps in west/east alleys at mid-point. Barrel clusters at spawn approaches + center junctions. Fence rows at Z=±1350 seal outer corridors. 6 spawn points: four corners + two mid-side pockets. Lighting: warm NW directional sun, overcast grey-blue sky, light haze fog (EXP2, density=0.00006).
+- **Playground:** Platforms at varying heights (120/240/420 cm), ramps to mid platforms, L-shaped cover walls, 2 containers at map edges. 8 spawn points at corners and cardinal edges. Lighting: bright midday sun from SE + cool fill light, sky-blue clearColor, atmospheric fog (EXP2, density=0.000035).
+
 ### Core Architecture (Implemented)
 - **GameManager** (`src/client/core/GameManager.ts`) — Singleton owning Engine + Havok WASM, manages scene lifecycle, initializes ImGuiManager
 - **GameScene** (`src/client/core/GameScene.ts`) — Abstract base class; each scene creates its own Babylon Scene
@@ -143,6 +147,13 @@ This project uses **Claude Code Agent Teams** for parallel development. Opus is 
 - **Rooms:** LobbyRoom (pre-game) → MatchRoom (gameplay), max 10 clients
 - **State sync:** 20Hz (patchRate 50ms), position interpolation at 12x lerp
 - **Hit detection:** Client-side raycast → `hit_claim` → server validates → `hit_confirmed`
+- **Hit validation / anti-cheat (MatchRoom):**
+  - Damage must exactly match `WEAPON_STATS[weaponId].damage`
+  - Projectile ID deduplication via `_claimedProjectileIds: Set<string>` (force-pruned at 2000; interval-pruned every 30s)
+  - Fire rate limit via `_lastHitClaimTime: Map<sessionId, ms>` — enforces `max(60ms, 70% of weapon fire interval)` between claims per attacker
+  - Distance cap: attacker → target ≤ 10000cm (covers all map diagonals with lag headroom)
+  - Dead/alive, self-hit, unknown weapon checks
+- **Weapon + reload state sync:** `_sendNetworkUpdate` sends `PlayerStateEnum.Reloading` when `weapon.isReloading`, overriding movement state so remote `CharacterModel.setState()` gets the correct state
 - **Schema:** `@type()` decorated fields MUST use `declare` keyword (prevents field initializer overwrite)
 - **Optional:** MatchScene checks `NetworkManager.isInMatch`, offline works without server
 - **Lean sync (implemented):** `leanAmount` (-1..1) is in `PlayerSchema` (`@type("float32") declare leanAmount`), `PlayerUpdateData`, sent every network tick from `_sendNetworkUpdate`, applied to remote players via `RemotePlayer._applyTorsoLean()` using `onAfterAnimationsObservable` — same bone-rotation technique as MirrorClone
@@ -171,8 +182,31 @@ This project uses **Claude Code Agent Teams** for parallel development. Opus is 
   - `SizeGradient` and `ColorGradient` animate scale and alpha over particle lifetime
   - Emitter position updated each call via `position.clone()` — single particle system instance reused per character
   - Disposal: `dispose()` frees GPU resources; MatchScene disposes all smoke instances in its `dispose()` method
+- **BulletSparkEffect** (`src/client/vfx/BulletSparkEffect.ts`) — bright additive spark burst at bullet impact points on hard surfaces
+  - 14 particles, BLENDMODE_ADD, fast emit (80-250 cm/s), heavy gravity (-400 cm/s²), shrinks to 0 at end of life
+  - `direction1`/`direction2` biased toward surface normal each `play()` call
+  - Single instance per WeaponManager, reused for all wall/prop hits
+- **BloodSplatterEffect** (`src/client/vfx/BloodSplatterEffect.ts`) — dark-red particle burst for character body hits
+  - 10 particles, BLENDMODE_STANDARD, deep red with ColorGradient fade to transparent, heavy gravity (-600 cm/s²)
+  - Single instance per WeaponManager, reused for all player/bot hits
 - **MatchScene integration:** `_updateJumpSmoke()` called each frame, detects `Idle/Walking → Jumping` state transition for local player and all bots; bot smoke effects are lazily created on first jump
+- **WeaponManager integration:** `_updateProjectiles()` dispatches `BulletSparkEffect.play()` for wall hits and `BloodSplatterEffect.play()` for `remote_body_*` hits
 - **Future:** Jump smoke for networked remote players pending Networking teammate exposing jump state in sync
+
+### MuzzleFlash (Improved)
+- **File:** `src/client/weapons/MuzzleFlash.ts`
+- **Per-weapon-class:** Constructor takes `WeaponCategory` — pistol/rifle/sniper differ in particle count, size, power, and light intensity/range
+- **Point light:** `PointLight` parented to emitter, warm orange-yellow (1.0, 0.8, 0.4), quadratic fade in `update(dt)` over 40ms
+- **API:** `flash()` triggers burst + lights; `update(dt)` fades light; `setCategory(cat)` updates class at runtime (called on weapon switch)
+- **WeaponManager:** calls `_muzzleFlash.update(dt)` each frame, `setCategory()` after `_switchToSlot()`, passes `category` to constructor
+
+### WeaponSway (Polished)
+- **File:** `src/client/weapons/WeaponSway.ts`
+- **Walk bob:** Figure-8 pattern — `|sin|*0.6 + sin(2x)*0.4` for natural footstep rhythm
+- **Idle breathing:** Asymmetric dual-frequency — two sine waves at different non-integer ratios per axis
+- **Recoil:** `recoilKickSnap` (default 0.35) splits kick into instant snap + spring remainder for snappy-but-smooth feel
+- **Mouse-lag drag:** Optional `FreeCamera` param in `update()` — tracks camera yaw/pitch delta, applies inverse offset, recovers via lerp; clamped to ±1.8cm/±1.2cm
+- **MatchScene:** Call site updated to pass `this._playerController.camera` as 5th argument
 
 ### Mirror Clone Debug Tool
 - **File:** `src/client/debug/MirrorClone.ts` — spawns a RemotePlayer that mirrors local player

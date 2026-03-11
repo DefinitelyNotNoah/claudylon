@@ -255,23 +255,39 @@
 - [x] Add new spawn point configurations per map (8 spawn points for Playground)
 - [x] Map selection UI in MainMenuUI (button row with highlight, persisted to localStorage)
 - [x] MatchScene refactored to delegate to MapBuilder via `createMapBuilder()`
-- [ ] Improve prop placement and cover layout for better gameplay flow on Shipment
-- [ ] Lighting and atmosphere improvements for existing maps
+- [x] Improve prop placement and cover layout for better gameplay flow on Shipment
+    - Container rows (N/S rows of 6 + mid row of 4 perpendicular) with flanking alleys
+    - Stacked containers for elevated sniping positions (NW and SE)
+    - Jeeps in west/east alleys as midpoint cover
+    - Barrel clusters at spawn approaches and center lane junctions
+    - Full north/south fence rows sealing outer corridors (10 pieces + end caps each side)
+    - 6 spawn points repositioned to corners + mid-side pockets with cover
+- [x] Lighting and atmosphere improvements for existing maps
+    - Shipment: warm NW sun, soft shadows (darkness=0.35), overcast grey-blue sky, light haze fog
+    - Playground: bright midday sun from SE, cool sky hemisphere + warm fill, blue sky clearColor, distance fog
 
 ### Networking Engineer
 - [x] Audit all gameplay features for multiplayer sync gaps
 - [x] Ensure leaning state syncs to remote players
-- [ ] Ensure weapon switching/reloading syncs correctly
+- [x] Ensure weapon switching/reloading syncs correctly
+    - weaponId already synced every tick via PlayerUpdateData — weapon switches visible immediately
+    - _sendNetworkUpdate now overrides movement state with PlayerStateEnum.Reloading when weapon is reloading
+    - RemotePlayer.updateFromServer() passes state to CharacterModel.setState() — reload state propagates correctly
 - [x] Validate singleplayer mode remains fully unnetworked
-- [ ] Improve hit validation and anti-cheat measures
+- [x] Improve hit validation and anti-cheat measures
+    - Projectile ID deduplication: Set<string> tracks claimed IDs, rejects duplicate claims
+    - Per-attacker fire rate limiting: enforces minimum interval per session based on weapon fire rate
+    - Distance validation: attacker and target must be within 10000cm (covers all maps with lag headroom)
+    - Periodic prune (30s) of claimed ID set to prevent memory growth; force-prune at 2000 IDs
+    - Attacker state cleanup on disconnect (_lastHitClaimTime entry removed in onLeave)
 
 ### Animator / VFX Dev
 - [x] Jump smoke puff effect (`src/client/vfx/JumpSmokeEffect.ts`) — cartoon particle burst at character feet on jump, plays for local player and all bots
 - [ ] Add weapon reload animations (viewmodel tilt is placeholder)
-- [ ] Improve muzzle flash effects
-- [ ] Add hit/impact visual effects
+- [x] Improve muzzle flash effects — per-weapon-class particles + point light pulse; `setCategory()` on weapon switch; `update()` light fade each frame
+- [x] Add hit/impact visual effects — `BulletSparkEffect.ts` (wall/prop sparks) and `BloodSplatterEffect.ts` (character hits) in `src/client/vfx/`; integrated into WeaponManager `_updateProjectiles`
 - [ ] Explore shader effects (e.g., damage vignette, scope overlay)
-- [ ] Polish weapon sway and recoil feel
+- [x] Polish weapon sway and recoil feel — figure-8 walk bob, asymmetric idle breathing, snappy recoil snap factor (`recoilKickSnap`), mouse-lag drag layer (`mouseLagAmount`); `WeaponSway.update()` now accepts optional `FreeCamera`
 - [ ] Jump smoke for networked remote players (requires Networking teammate to expose jump state in sync)
 
 ### Cross-Team
