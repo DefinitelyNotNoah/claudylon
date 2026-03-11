@@ -241,6 +241,37 @@
 - [x] Horizontal camera offset perpendicular to facing direction
 - [x] Viewmodel lean shift and tilt in WeaponSway
 
+## Agent Team Tasks
+
+> Development is now structured around Agent Teams. The lead (Opus) assigns tasks to specialized teammates.
+> Roles: Map Builder, Networking Engineer, Animator/VFX Dev (all Sonnet).
+> Each role owns specific files — see CLAUDE.md "Agent Teams" section for ownership rules.
+
+### Map Builder
+- [ ] Design and build additional maps beyond Shipment
+- [ ] Improve prop placement and cover layout for better gameplay flow
+- [ ] Add new spawn point configurations per map
+- [ ] Lighting and atmosphere improvements
+
+### Networking Engineer
+- [ ] Audit all gameplay features for multiplayer sync gaps
+- [ ] Ensure leaning state syncs to remote players
+- [ ] Ensure weapon switching/reloading syncs correctly
+- [ ] Validate singleplayer mode remains fully unnetworked
+- [ ] Improve hit validation and anti-cheat measures
+
+### Animator / VFX Dev
+- [ ] Add weapon reload animations (viewmodel tilt is placeholder)
+- [ ] Improve muzzle flash effects
+- [ ] Add hit/impact visual effects
+- [ ] Explore shader effects (e.g., damage vignette, scope overlay)
+- [ ] Polish weapon sway and recoil feel
+
+### Cross-Team
+- [ ] Coordinate leaning sync (Animator defines visuals → Networking syncs state)
+- [ ] New maps need networking spawn point support (Map Builder → Networking)
+- [ ] VFX need to play for remote players (Animator → Networking)
+
 ## Mirror Clone Debug Tool (DONE)
 - [x] MirrorClone class (`src/client/debug/MirrorClone.ts`)
     - [x] Spawn/despawn RemotePlayer at configurable offset

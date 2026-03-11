@@ -1,6 +1,23 @@
 > Before making any decisions or writing any code, always read TODO.md and README.md in full first.
 > After completing any plan implementation, always commit all changes and push to origin.
 
+## Agent Teams (Active)
+
+This project uses **Claude Code Agent Teams** for parallel development. Opus is the team lead; teammates are Sonnet instances with specialized roles.
+
+### Team Roles & File Ownership
+- **Lead (Opus):** Coordination, architecture, task delegation, synthesis
+- **Map Builder (Sonnet):** `src/client/scenes/MatchScene.ts` map construction, `projects/` scene JSON, props, lighting, spawn points
+- **Networking Engineer (Sonnet):** `src/client/network/`, `src/server/`, `src/shared/types/` (networking), multiplayer sync, hit validation, keeping singleplayer unnetworked
+- **Animator / VFX Dev (Sonnet):** `src/client/weapons/` (WeaponSway, MuzzleFlash, viewmodel), `src/client/debug/MirrorClone.ts`, shaders, visual effects
+
+### Rules for Teammates
+- **Do NOT edit files owned by another role** without coordinating through the lead or messaging that teammate
+- **Always read CLAUDE.md and TODO.md** before starting work
+- **Commit and push** after completing each task
+- **Message the Networking Engineer** whenever adding a feature that needs multiplayer sync
+- **Follow all code standards** in this file (JSDoc, explicit types, 4-space indent, OOP)
+
 ## Locked-In Decisions
 
 ### Tech Stack
