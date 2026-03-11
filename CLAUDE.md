@@ -1,6 +1,17 @@
 > Before making any decisions or writing any code, always read TODO.md and README.md in full first.
 > After completing any plan implementation, always commit all changes and push to origin.
 
+## MANDATORY: Documentation Updates
+
+> **CRITICAL — This rule applies to ALL agents (lead and teammates) on EVERY task, no exceptions.**
+
+After completing ANY task (code change, bug fix, feature, refactor, research):
+1. **Update TODO.md** — mark completed items `[x]`, add new items discovered during work
+2. **Update CLAUDE.md** — if you added a new system, changed architecture, added constants, or made any decision that future sessions need to know about
+3. **Commit and push** all changes including doc updates
+
+This is NOT optional. Context windows reset. Documentation is the ONLY persistent memory across sessions. If you don't update docs, work gets lost or duplicated. Every response that involves code changes MUST end with doc updates.
+
 ## Agent Teams (Active)
 
 This project uses **Claude Code Agent Teams** for parallel development. Opus is the team lead; teammates are Sonnet instances with specialized roles.
@@ -14,6 +25,7 @@ This project uses **Claude Code Agent Teams** for parallel development. Opus is 
 ### Rules for Teammates
 - **Do NOT edit files owned by another role** without coordinating through the lead or messaging that teammate
 - **Always read CLAUDE.md and TODO.md** before starting work
+- **Update TODO.md and CLAUDE.md after every task** (see MANDATORY section above)
 - **Commit and push** after completing each task
 - **Message the Networking Engineer** whenever adding a feature that needs multiplayer sync
 - **Follow all code standards** in this file (JSDoc, explicit types, 4-space indent, OOP)
