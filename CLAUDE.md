@@ -77,8 +77,8 @@
 ### Core Architecture (Implemented)
 - **GameManager** (`src/client/core/GameManager.ts`) — Singleton owning Engine + Havok WASM, manages scene lifecycle, initializes ImGuiManager
 - **GameScene** (`src/client/core/GameScene.ts`) — Abstract base class; each scene creates its own Babylon Scene
-- **InputManager** (`src/client/core/InputManager.ts`) — Keyboard/mouse/pointer lock; jump is one-shot; L key for ImGui toggle
-- **PlayerController** (`src/client/player/PlayerController.ts`) — Havok PhysicsCharacterController capsule, manually driven FreeCamera (inputs.clear()), viewmodel anchor
+- **InputManager** (`src/client/core/InputManager.ts`) — Keyboard/mouse/pointer lock; jump is one-shot; L key for ImGui toggle; Q/E lean hold inputs; F interact
+- **PlayerController** (`src/client/player/PlayerController.ts`) — Havok PhysicsCharacterController capsule, manually driven FreeCamera (inputs.clear()), viewmodel anchor, leaning system (Q/E)
 - **PlayerStateMachine** (`src/client/player/PlayerStateMachine.ts`) — Enum-based: Idle ↔ Walking, both → Jumping → Falling → land
 - **WeaponManager** (`src/client/weapons/WeaponManager.ts`) — Manages weapon switching, firing, reloading, ammo, viewmodel, sway, muzzle flash
 - **WeaponViewmodel** (`src/client/weapons/WeaponViewmodel.ts`) — Loads GLB, parents to camera anchor, rendering group 1 with depth clear
@@ -90,6 +90,7 @@
 - **ImGuiManager** (`src/client/ui/ImGuiManager.ts`) — Singleton, Dear ImGui overlay canvas, hooks into engine render loop
 - **GraphicsSettings** (`src/client/ui/GraphicsSettings.ts`) — Singleton, manages DefaultRenderingPipeline, localStorage persistence
 - **CrosshairHUD** (`src/client/ui/CrosshairHUD.ts`) — Babylon GUI AdvancedDynamicTexture fullscreen overlay
+- **MirrorClone** (`src/client/debug/MirrorClone.ts`) — Debug RemotePlayer that mirrors local player position, rotation, weapon, firing, and leaning; uses onAfterAnimationsObservable for bone rotation
 - **MatchScene** (`src/client/scenes/MatchScene.ts`) — Shipment map: ground, walls, props, lighting, player spawn, bot management, ImGui integration
 - **MainMenuScene** (`src/client/scenes/MainMenuScene.ts`) — Main menu with Host/Join/Offline buttons, options, create-a-class
 - **LobbyScene** (`src/client/scenes/LobbyScene.ts`) — Pre-game lobby with player list and host start
@@ -99,7 +100,7 @@
 - **Package:** `@mori2003/jsimgui` v0.13.0 — Dear ImGui JS bindings, WebGL2 canvas overlay
 - **Architecture:** Separate `<canvas>` at z-index 100 with `pointer-events: none`; document-level mouse/keyboard listeners feed ImGui IO directly
 - **Tab modules:** `src/client/ui/imgui/` — each tab is a standalone draw function with a context interface
-- **Tabs:** Player, Bots, Weapons, Audio, Graphics, Physics, Progression, Performance, Settings
+- **Tabs:** Player, Bots, Weapons, Audio, Graphics, Physics, Progression, Performance, Mirror, Settings
 - **Adding a tab:** Create `src/client/ui/imgui/MyTab.ts` with context interface + `drawMyTab(ctx)`, wire in MatchScene draw callback
 
 ### Networking (Colyseus 0.17)
@@ -115,3 +116,21 @@
 - **XP per kill:** 100 (configurable via `XP_PER_KILL`)
 - **Weapons unlock** at level thresholds defined in `WEAPON_UNLOCK_REQUIREMENTS`
 - **Create-a-Class:** 4 preset loadouts + custom, locked weapons greyed out
+
+### Leaning System
+- **Keys:** Q (lean left), E (lean right) — hold to lean, release to return upright
+- **Camera:** Quaternion-based rotation (`Yaw * Pitch * Roll`) to avoid gimbal lock — Euler rotation with non-zero roll causes axis coupling
+- **Parameters (all tunable via Mirror ImGui tab):**
+  - `maxLeanAngle` — camera roll angle in radians (default 30 degrees / 0.524 rad)
+  - `leanSpeed` — interpolation speed (default 8.0/s)
+  - `leanOffset` — horizontal camera shift in cm (default 30cm)
+- **Viewmodel:** WeaponSway receives `leanAmount` param, applies sideways shift (3.0 units) + tilt (0.08 rad)
+- **Interact key:** F (not E, which is lean right)
+
+### Mirror Clone Debug Tool
+- **File:** `src/client/debug/MirrorClone.ts` — spawns a RemotePlayer that mirrors local player
+- **Features:** Position tracking, weapon sync, fire sync (recoil + spatial audio), torso lean
+- **Lean sync:** Uses `onAfterAnimationsObservable` to apply quaternion rotation to spine bones (Spine, Spine1, Spine2) AFTER animation evaluation — prevents animations from overwriting
+- **Lean axis:** Derived from Head bone's world-space forward direction (horizontal projection), transformed into each spine bone's parent local space — accounts for animation pose offset (gun-holding stance)
+- **Torso lean ratio:** Scales camera lean for third-person model (default 1.0 = 100%, tunable 0-2x)
+- **ImGui tab:** `src/client/ui/imgui/MirrorTab.ts` — spawn/despawn, offset distance, collision toggle, rotation lock, leaning params, torso lean ratio

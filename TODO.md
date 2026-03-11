@@ -232,3 +232,30 @@
     - [x] Resolution display
     - [x] Reset stats button
 - [x] Wire all new tabs into MatchScene draw callback with context builders
+
+## Player Leaning System (DONE)
+- [x] Add Q (lean left) and E (lean right) held inputs to InputManager
+- [x] Change interact key from E to F (free Q/E for leaning)
+- [x] Smooth lean interpolation in PlayerController (configurable angle, speed, offset)
+- [x] Quaternion camera rotation (Yaw * Pitch * Roll) to avoid gimbal lock
+- [x] Horizontal camera offset perpendicular to facing direction
+- [x] Viewmodel lean shift and tilt in WeaponSway
+
+## Mirror Clone Debug Tool (DONE)
+- [x] MirrorClone class (`src/client/debug/MirrorClone.ts`)
+    - [x] Spawn/despawn RemotePlayer at configurable offset
+    - [x] Position, rotation, weapon, and state sync from local player
+    - [x] Fire sync with recoil animation + spatial gunshot audio
+    - [x] Collision toggle (pickable hitbox)
+    - [x] Rotation lock with manual yaw/pitch controls
+- [x] Torso lean on clone via spine bone quaternion rotation
+    - [x] onAfterAnimationsObservable hook (prevents animation overwrite)
+    - [x] Distributed across Spine, Spine1, Spine2 bones for natural curve
+    - [x] Head bone-relative lean axis (accounts for animation pose offset)
+    - [x] Tunable torso lean ratio (default 1.0, range 0-2x)
+- [x] Mirror ImGui tab (`src/client/ui/imgui/MirrorTab.ts`)
+    - [x] Spawn/despawn button
+    - [x] Offset distance slider
+    - [x] Collision checkbox
+    - [x] Leaning section: lean amount display, max angle, speed, offset, torso ratio
+    - [x] Rotation lock section: lock checkbox, yaw/pitch sliders, reset button
