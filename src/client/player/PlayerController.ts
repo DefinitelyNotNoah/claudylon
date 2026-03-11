@@ -56,8 +56,8 @@ export class PlayerController {
     private _noclip: boolean = false;
     /** Current lean amount: -1 = full left, 0 = upright, +1 = full right. */
     private _leanAmount: number = 0;
-    /** Maximum lean angle in radians (default ~15 degrees). */
-    private _maxLeanAngle: number = 0.26;
+    /** Maximum lean angle in radians (default 30 degrees). */
+    private _maxLeanAngle: number = 0.524;
     /** How fast leaning interpolates (per second). */
     private _leanSpeed: number = 8.0;
     /** Horizontal camera offset when fully leaned (cm). */

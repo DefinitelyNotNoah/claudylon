@@ -6,7 +6,9 @@
  */
 
 import { Scene } from "@babylonjs/core/scene";
+import { Observer } from "@babylonjs/core/Misc/observable";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { PLAYER_STATS } from "../../shared/constants/PlayerConstants";
 import { RemotePlayer } from "../network/RemotePlayer";
 import type { PlayerController } from "../player/PlayerController";
@@ -43,6 +45,15 @@ export class MirrorClone {
 
     /** The last weapon ID synced, to detect changes. */
     private _lastWeaponId: string = "";
+
+    /** Cached Spine1 bone TransformNode for lean rotation. */
+    private _spineBoneNode: TransformNode | null = null;
+
+    /** Observer that applies lean rotation after skeleton animation evaluates. */
+    private _afterAnimObserver: Observer<Scene> | null = null;
+
+    /** Current lean angle to apply (set during update, applied after animations). */
+    private _pendingLeanAngle: number = 0;
 
     /**
      * Creates a MirrorClone manager.
@@ -168,6 +179,11 @@ export class MirrorClone {
         // Apply collision setting
         this.collisionEnabled = this._collisionEnabled;
 
+        // Register post-animation observer to apply lean after skeleton evaluation
+        this._afterAnimObserver = this._scene.onAfterAnimationsObservable.add(() => {
+            this._applyLeanToBone();
+        });
+
         console.log("[MirrorClone] Spawned at offset", this._offsetDistance, "cm");
     }
 
@@ -176,6 +192,14 @@ export class MirrorClone {
      */
     public despawn(): void {
         if (!this._remote) return;
+
+        if (this._afterAnimObserver) {
+            this._scene.onAfterAnimationsObservable.remove(this._afterAnimObserver);
+            this._afterAnimObserver = null;
+        }
+        this._spineBoneNode = null;
+        this._pendingLeanAngle = 0;
+
         this._remote.dispose();
         this._remote = null;
         this._lastWeaponId = "";
@@ -216,12 +240,9 @@ export class MirrorClone {
         );
         this._remote.update(dt);
 
-        // Apply lean tilt to the clone's character model root.
-        // Using the model root (child of RemotePlayer._root) so it tilts
-        // in the character's local space (relative to facing direction).
+        // Store lean angle — applied after animation evaluation via observer
         const leanAmount = this._playerController.leanAmount;
-        const leanAngle = -leanAmount * this._playerController.maxLeanAngle;
-        this._applyLean(leanAngle);
+        this._pendingLeanAngle = -leanAmount * this._playerController.maxLeanAngle;
 
         this._lastWeaponId = weaponId;
     }
@@ -243,19 +264,29 @@ export class MirrorClone {
     }
 
     /**
-     * Applies lean rotation to the clone's character model root.
-     * Tilts the entire character in their local space (post-yaw).
-     * @param leanAngle - Lean angle in radians (negative = left, positive = right).
+     * Applies lean rotation to the Spine1 bone after skeleton animation evaluation.
+     * Called from onAfterAnimationsObservable so it runs after bone poses are set,
+     * preventing animations from overwriting the lean tilt.
      */
-    private _applyLean(leanAngle: number): void {
-        if (!this._remote) return;
+    private _applyLeanToBone(): void {
+        if (!this._remote || Math.abs(this._pendingLeanAngle) < 0.001) return;
 
-        const charModel = this._remote.characterModel;
-        if (!charModel) return;
+        // Lazily find and cache the Spine1 bone TransformNode
+        if (!this._spineBoneNode) {
+            const charModel = this._remote.characterModel;
+            if (!charModel || !charModel.skeleton) return;
 
-        // Tilt the character model root on its local X axis (forward tilt axis
-        // in the model's space, which becomes a side-lean after yaw rotation)
-        charModel.root.rotation.z = leanAngle;
+            for (const bone of charModel.skeleton.bones) {
+                if (bone.name === "mixamorig:Spine1") {
+                    this._spineBoneNode = bone.getTransformNode() ?? null;
+                    break;
+                }
+            }
+            if (!this._spineBoneNode) return;
+        }
+
+        // Additively rotate the spine bone in its local Z axis (lean)
+        this._spineBoneNode.rotation.z += this._pendingLeanAngle;
     }
 
     /**
