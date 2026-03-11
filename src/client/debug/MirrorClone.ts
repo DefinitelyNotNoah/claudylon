@@ -49,8 +49,8 @@ export class MirrorClone {
     /** The last weapon ID synced, to detect changes. */
     private _lastWeaponId: string = "";
 
-    /** How much of the camera lean angle to apply to the torso (0-1). */
-    private _torsoLeanRatio: number = 0.6;
+    /** How much of the camera lean angle to apply to the torso (0-2). */
+    private _torsoLeanRatio: number = 1.0;
 
     /** Cached spine bone TransformNodes for lean rotation. */
     private _spineBoneNodes: TransformNode[] = [];
@@ -307,7 +307,7 @@ export class MirrorClone {
 
         // Distribute the total lean angle evenly across the spine bones
         const perBoneAngle = this._pendingLeanAngle / this._spineBoneNodes.length;
-        const leanQ = Quaternion.RotationAxis(Vector3.Forward(), perBoneAngle);
+        const leanQ = Quaternion.RotationAxis(Vector3.Right(), perBoneAngle);
 
         for (const tn of this._spineBoneNodes) {
             const q = tn.rotationQuaternion;
