@@ -7,7 +7,7 @@
 
 import { Scene } from "@babylonjs/core/scene";
 import { Observer } from "@babylonjs/core/Misc/observable";
-import { Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { PLAYER_STATS } from "../../shared/constants/PlayerConstants";
 import { RemotePlayer } from "../network/RemotePlayer";
@@ -54,6 +54,9 @@ export class MirrorClone {
 
     /** Cached spine bone TransformNodes for lean rotation. */
     private _spineBoneNodes: TransformNode[] = [];
+
+    /** Cached Head bone TransformNode to derive lean axis from look direction. */
+    private _headBoneNode: TransformNode | null = null;
 
     /** Observer that applies lean rotation after skeleton animation evaluates. */
     private _afterAnimObserver: Observer<Scene> | null = null;
@@ -213,6 +216,7 @@ export class MirrorClone {
             this._afterAnimObserver = null;
         }
         this._spineBoneNodes = [];
+        this._headBoneNode = null;
         this._pendingLeanAngle = 0;
 
         this._remote.dispose();
@@ -284,15 +288,20 @@ export class MirrorClone {
      * Applies lean rotation distributed across spine bones after skeleton
      * animation evaluation. Distributing the angle across Spine, Spine1,
      * and Spine2 produces a natural curve instead of a single harsh joint.
+     *
+     * The lean axis is derived from the Head bone's world-space forward
+     * direction projected onto the horizontal plane, so the lean is always
+     * relative to the direction the character is actually looking — not a
+     * hardcoded axis that ignores the animation pose.
      */
     private _applyLeanToBone(): void {
         if (!this._remote || Math.abs(this._pendingLeanAngle) < 0.001) return;
 
-        // Lazily find and cache all spine bone TransformNodes
-        if (this._spineBoneNodes.length === 0) {
-            const charModel = this._remote.characterModel;
-            if (!charModel || !charModel.skeleton) return;
+        const charModel = this._remote.characterModel;
+        if (!charModel || !charModel.skeleton) return;
 
+        // Lazily find and cache spine + head bone TransformNodes
+        if (this._spineBoneNodes.length === 0) {
             for (const boneName of LEAN_BONES) {
                 for (const bone of charModel.skeleton.bones) {
                     if (bone.name === boneName) {
@@ -302,21 +311,48 @@ export class MirrorClone {
                     }
                 }
             }
+            for (const bone of charModel.skeleton.bones) {
+                if (bone.name === "mixamorig:Head") {
+                    this._headBoneNode = bone.getTransformNode() ?? null;
+                    break;
+                }
+            }
             if (this._spineBoneNodes.length === 0) return;
         }
 
-        // Distribute the total lean angle evenly across the spine bones.
-        // Pre-multiply (leanQ * animQ) to rotate in parent space, not bone-local.
-        // In parent space, Forward (Z) is the character's chest direction,
-        // so rotating around Z produces a side-lean.
+        // Get the head's world-space forward direction from its world matrix.
+        // Row 2 (index 8-10) of the world matrix is the local Z (forward) axis.
+        const headNode = this._headBoneNode ?? this._spineBoneNodes[this._spineBoneNodes.length - 1];
+        headNode.computeWorldMatrix(true);
+        const world = headNode.getWorldMatrix();
+        const m = world.m;
+        // Extract forward (Z-axis row) and project onto horizontal plane
+        const headFwd = new Vector3(m[8], 0, m[10]);
+        if (headFwd.lengthSquared() < 0.001) {
+            headFwd.set(0, 0, 1);
+        }
+        headFwd.normalize();
+
+        // For each spine bone, convert the head-forward axis into the bone's
+        // parent local space and rotate around it.
         const perBoneAngle = this._pendingLeanAngle / this._spineBoneNodes.length;
-        const leanQ = Quaternion.RotationAxis(Vector3.Forward(), perBoneAngle);
 
         for (const tn of this._spineBoneNodes) {
             const q = tn.rotationQuaternion;
-            if (q) {
-                tn.rotationQuaternion = leanQ.multiply(q);
+            if (!q) continue;
+
+            // Get parent's inverse world matrix to transform axis into local space
+            const parent = tn.parent as TransformNode | null;
+            let leanAxis = headFwd;
+            if (parent) {
+                parent.computeWorldMatrix(true);
+                const parentInv = Matrix.Invert(parent.getWorldMatrix());
+                leanAxis = Vector3.TransformNormal(headFwd, parentInv);
+                leanAxis.normalize();
             }
+
+            const leanQ = Quaternion.RotationAxis(leanAxis, perBoneAngle);
+            tn.rotationQuaternion = leanQ.multiply(q);
         }
     }
 
