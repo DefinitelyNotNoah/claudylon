@@ -305,14 +305,17 @@ export class MirrorClone {
             if (this._spineBoneNodes.length === 0) return;
         }
 
-        // Distribute the total lean angle evenly across the spine bones
+        // Distribute the total lean angle evenly across the spine bones.
+        // Pre-multiply (leanQ * animQ) to rotate in parent space, not bone-local.
+        // In parent space, Forward (Z) is the character's chest direction,
+        // so rotating around Z produces a side-lean.
         const perBoneAngle = this._pendingLeanAngle / this._spineBoneNodes.length;
-        const leanQ = Quaternion.RotationAxis(Vector3.Right(), perBoneAngle);
+        const leanQ = Quaternion.RotationAxis(Vector3.Forward(), perBoneAngle);
 
         for (const tn of this._spineBoneNodes) {
             const q = tn.rotationQuaternion;
             if (q) {
-                tn.rotationQuaternion = q.multiply(leanQ);
+                tn.rotationQuaternion = leanQ.multiply(q);
             }
         }
     }
