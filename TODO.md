@@ -261,11 +261,13 @@
 - [ ] Improve hit validation and anti-cheat measures
 
 ### Animator / VFX Dev
+- [x] Jump smoke puff effect (`src/client/vfx/JumpSmokeEffect.ts`) — cartoon particle burst at character feet on jump, plays for local player and all bots
 - [ ] Add weapon reload animations (viewmodel tilt is placeholder)
 - [ ] Improve muzzle flash effects
 - [ ] Add hit/impact visual effects
 - [ ] Explore shader effects (e.g., damage vignette, scope overlay)
 - [ ] Polish weapon sway and recoil feel
+- [ ] Jump smoke for networked remote players (requires Networking teammate to expose jump state in sync)
 
 ### Cross-Team
 - [x] Coordinate leaning sync (Animator defines visuals → Networking syncs state)

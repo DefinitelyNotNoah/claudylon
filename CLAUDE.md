@@ -156,6 +156,18 @@ This project uses **Claude Code Agent Teams** for parallel development. Opus is 
 - **Viewmodel:** WeaponSway receives `leanAmount` param, applies sideways shift (3.0 units) + tilt (0.08 rad)
 - **Interact key:** F (not E, which is lean right)
 
+### VFX System
+- **Directory:** `src/client/vfx/`
+- **JumpSmokeEffect** (`src/client/vfx/JumpSmokeEffect.ts`) — cartoon smoke puff particle burst at a character's feet when they jump
+  - Uses Babylon.js `ParticleSystem` with `manualEmitCount` burst mode (no continuous emit rate)
+  - 12 particles per burst, lifetime 0.25-0.45s, starts 8-18cm radius expanding to 48cm, alpha fades to 0
+  - Light gray color, `BLENDMODE_STANDARD`, slight upward gravity drift (20 cm/s), radial outward spread (40-90 cm/s)
+  - `SizeGradient` and `ColorGradient` animate scale and alpha over particle lifetime
+  - Emitter position updated each call via `position.clone()` — single particle system instance reused per character
+  - Disposal: `dispose()` frees GPU resources; MatchScene disposes all smoke instances in its `dispose()` method
+- **MatchScene integration:** `_updateJumpSmoke()` called each frame, detects `Idle/Walking → Jumping` state transition for local player and all bots; bot smoke effects are lazily created on first jump
+- **Future:** Jump smoke for networked remote players pending Networking teammate exposing jump state in sync
+
 ### Mirror Clone Debug Tool
 - **File:** `src/client/debug/MirrorClone.ts` — spawns a RemotePlayer that mirrors local player
 - **Features:** Position tracking, weapon sync, fire sync (recoil + spatial audio), torso lean
