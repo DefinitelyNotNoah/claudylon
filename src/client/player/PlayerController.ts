@@ -6,7 +6,7 @@
  */
 
 import { Scene } from "@babylonjs/core/scene";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { FreeCamera } from "@babylonjs/core/Cameras/freeCamera";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import {
@@ -433,7 +433,6 @@ export class PlayerController {
         const eyeHeight = PLAYER_STATS.capsuleHeight / 2 - 15;
 
         // Lean: horizontal camera offset perpendicular to facing direction
-        const leanRoll = -this._leanAmount * this._maxLeanAngle;
         const lateralOffset = this._leanAmount * this._leanOffset;
         const rightX = Math.cos(this._yaw);
         const rightZ = -Math.sin(this._yaw);
@@ -443,7 +442,14 @@ export class PlayerController {
             pos.y + eyeHeight,
             pos.z + rightZ * lateralOffset,
         );
-        this._camera.rotation.set(this._pitch, this._yaw, leanRoll);
+
+        // Use quaternion rotation to avoid gimbal lock when lean roll is applied.
+        // Compose: Yaw (Y-axis) * Pitch (X-axis) * Roll (Z-axis)
+        const leanRoll = -this._leanAmount * this._maxLeanAngle;
+        const qYaw = Quaternion.RotationAxis(Vector3.Up(), this._yaw);
+        const qPitch = Quaternion.RotationAxis(Vector3.Right(), this._pitch);
+        const qRoll = Quaternion.RotationAxis(Vector3.Forward(), leanRoll);
+        this._camera.rotationQuaternion = qYaw.multiply(qPitch).multiply(qRoll);
     }
 
     /**

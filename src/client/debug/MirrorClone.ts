@@ -216,10 +216,12 @@ export class MirrorClone {
         );
         this._remote.update(dt);
 
-        // Apply lean tilt to the clone's upper spine bone
+        // Apply lean tilt to the clone's character model root.
+        // Using the model root (child of RemotePlayer._root) so it tilts
+        // in the character's local space (relative to facing direction).
         const leanAmount = this._playerController.leanAmount;
         const leanAngle = -leanAmount * this._playerController.maxLeanAngle;
-        this._applyLeanToBones(leanAngle);
+        this._applyLean(leanAngle);
 
         this._lastWeaponId = weaponId;
     }
@@ -241,26 +243,19 @@ export class MirrorClone {
     }
 
     /**
-     * Applies lean rotation to the clone's upper spine bone.
-     * Rotating Spine1 tilts the upper body, arms, head, and weapon naturally.
+     * Applies lean rotation to the clone's character model root.
+     * Tilts the entire character in their local space (post-yaw).
      * @param leanAngle - Lean angle in radians (negative = left, positive = right).
      */
-    private _applyLeanToBones(leanAngle: number): void {
+    private _applyLean(leanAngle: number): void {
         if (!this._remote) return;
 
         const charModel = this._remote.characterModel;
-        if (!charModel || !charModel.skeleton) return;
+        if (!charModel) return;
 
-        // Find and rotate Spine1 bone (upper spine — tilts torso, arms, head)
-        for (const bone of charModel.skeleton.bones) {
-            if (bone.name === "mixamorig:Spine1") {
-                const tn = bone.getTransformNode();
-                if (tn) {
-                    tn.rotation.z = leanAngle;
-                }
-                break;
-            }
-        }
+        // Tilt the character model root on its local X axis (forward tilt axis
+        // in the model's space, which becomes a side-lean after yaw rotation)
+        charModel.root.rotation.z = leanAngle;
     }
 
     /**
