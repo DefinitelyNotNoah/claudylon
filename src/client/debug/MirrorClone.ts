@@ -280,6 +280,13 @@ export class MirrorClone {
         // Rotation: copy player or use locked values
         const cloneYaw = this._rotationLocked ? this._lockedYaw : yaw + Math.PI;
 
+        // Lateral lean offset: shift clone sideways based on lean amount
+        const leanAmount = this._playerController.leanAmount;
+        const lateralShift = leanAmount * this._modelLeanOffset;
+        // Right vector perpendicular to clone's facing direction
+        const cloneRightX = Math.cos(cloneYaw);
+        const cloneRightZ = -Math.sin(cloneYaw);
+
         // State: mirror player state
         const state = this._playerController.state;
 
@@ -287,7 +294,9 @@ export class MirrorClone {
         const weaponId = this._weaponManager.activeWeapon.id;
 
         this._remote.updateFromServer(
-            offsetX, groundY, offsetZ,
+            offsetX + cloneRightX * lateralShift,
+            groundY,
+            offsetZ + cloneRightZ * lateralShift,
             cloneYaw,
             100,
             state,
@@ -298,7 +307,6 @@ export class MirrorClone {
         // Store lean angle — applied after animation evaluation via observer.
         // Use the model's own maxLeanAngle (independent from POV camera lean)
         // and scale by torsoLeanRatio for tuning.
-        const leanAmount = this._playerController.leanAmount;
         const maxAngle = this._modelMaxLeanAngle * this._torsoLeanRatio;
         this._pendingLeanAngle = -leanAmount * maxAngle;
 
