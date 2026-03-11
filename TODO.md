@@ -248,10 +248,15 @@
 > Each role owns specific files — see CLAUDE.md "Agent Teams" section for ownership rules.
 
 ### Map Builder
-- [ ] Design and build additional maps beyond Shipment
-- [ ] Improve prop placement and cover layout for better gameplay flow
-- [ ] Add new spawn point configurations per map
-- [ ] Lighting and atmosphere improvements
+- [x] Design and build additional maps beyond Shipment
+    - [x] Map system: `MapRegistry.ts`, `MapBuilder.ts` (abstract), `MapFactory.ts`
+    - [x] `ShipmentMap.ts` — extracted from MatchScene, standalone builder
+    - [x] `PlaygroundMap.ts` — 5000x5000 cm test arena with platforms, ramps, cover
+- [x] Add new spawn point configurations per map (8 spawn points for Playground)
+- [x] Map selection UI in MainMenuUI (button row with highlight, persisted to localStorage)
+- [x] MatchScene refactored to delegate to MapBuilder via `createMapBuilder()`
+- [ ] Improve prop placement and cover layout for better gameplay flow on Shipment
+- [ ] Lighting and atmosphere improvements for existing maps
 
 ### Networking Engineer
 - [x] Audit all gameplay features for multiplayer sync gaps

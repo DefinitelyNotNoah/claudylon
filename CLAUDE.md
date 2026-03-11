@@ -100,7 +100,8 @@ This project uses **Claude Code Agent Teams** for parallel development. Opus is 
 - Materials: `mat_{surface}`
 
 ### World Scale
-- Centimeters: gravity = (0, -981, 0), player height = 180 cm, map = 3000x3000 cm
+- Centimeters: gravity = (0, -981, 0), player height = 180 cm
+- Shipment map: 3000×3000 cm. Playground map: 5000×5000 cm
 - GLB models authored in meters should be scaled by 100
 
 ### Core Architecture (Implemented)
@@ -120,8 +121,13 @@ This project uses **Claude Code Agent Teams** for parallel development. Opus is 
 - **GraphicsSettings** (`src/client/ui/GraphicsSettings.ts`) — Singleton, manages DefaultRenderingPipeline, localStorage persistence
 - **CrosshairHUD** (`src/client/ui/CrosshairHUD.ts`) — Babylon GUI AdvancedDynamicTexture fullscreen overlay
 - **MirrorClone** (`src/client/debug/MirrorClone.ts`) — Debug RemotePlayer that mirrors local player position, rotation, weapon, firing, and leaning; uses onAfterAnimationsObservable for bone rotation
-- **MatchScene** (`src/client/scenes/MatchScene.ts`) — Shipment map: ground, walls, props, lighting, player spawn, bot management, ImGui integration
-- **MainMenuScene** (`src/client/scenes/MainMenuScene.ts`) — Main menu with Host/Join/Offline buttons, options, create-a-class
+- **MatchScene** (`src/client/scenes/MatchScene.ts`) — Delegates map construction to a MapBuilder, spawns player, manages bots and ImGui
+- **MapBuilder** (`src/client/maps/MapBuilder.ts`) — Abstract base; `build()` returns `{ spawnPoints, shadowGenerator }`
+- **ShipmentMap** (`src/client/maps/ShipmentMap.ts`) — Compact shipping yard (3000×3000 cm), extracted from MatchScene
+- **PlaygroundMap** (`src/client/maps/PlaygroundMap.ts`) — Large test arena (5000×5000 cm), platforms, ramps, cover walls
+- **MapFactory** (`src/client/maps/MapFactory.ts`) — `createMapBuilder(mapId, scene)` factory function
+- **MapRegistry** (`src/shared/constants/MapRegistry.ts`) — `MAP_REGISTRY` array, `MapId` type, `SELECTED_MAP_KEY` localStorage key
+- **MainMenuScene** (`src/client/scenes/MainMenuScene.ts`) — Main menu with map selection, Host/Join/Offline buttons, options, create-a-class
 - **LobbyScene** (`src/client/scenes/LobbyScene.ts`) — Pre-game lobby with player list and host start
 
 ### ImGui Debug Panel

@@ -1,12 +1,11 @@
 /**
- * The playable match scene. Builds the Shipment map programmatically,
- * spawns the player, loads weapon viewmodel, and shows the crosshair HUD.
+ * The playable match scene. Delegates map construction to the selected
+ * MapBuilder, spawns the player, loads the weapon viewmodel, and shows the HUD.
  * @module client/scenes/MatchScene
  */
 
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
-import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";

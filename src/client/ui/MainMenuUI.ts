@@ -1,5 +1,5 @@
 /**
- * Main menu UI overlay with title, Host/Join/Offline buttons,
+ * Main menu UI overlay with title, map selection, Host/Join/Offline buttons,
  * display name input, Create-a-Class, Options, and Quit.
  * Settings (sensitivity, volume, debug, bots, graphics) are
  * in the Options sub-menu via OptionsMenuUI.
@@ -14,10 +14,13 @@ import { TextBlock } from "@babylonjs/gui/2D/controls/textBlock";
 import { Button } from "@babylonjs/gui/2D/controls/button";
 import { InputText } from "@babylonjs/gui/2D/controls/inputText";
 import { StackPanel } from "@babylonjs/gui/2D/controls/stackPanel";
+import { Grid } from "@babylonjs/gui/2D/controls/grid";
 import { Control } from "@babylonjs/gui/2D/controls/control";
 
 import { CreateClassUI } from "./CreateClassUI";
 import { OptionsMenuUI } from "./OptionsMenuUI";
+import { MAP_REGISTRY, SELECTED_MAP_KEY, DEFAULT_MAP_ID } from "../../shared/constants/MapRegistry";
+import type { MapId } from "../../shared/constants/MapRegistry";
 
 /** Button width in pixels. */
 const BUTTON_WIDTH = "300px";
@@ -89,7 +92,7 @@ function createInputField(name: string, placeholder: string, initialValue: strin
 }
 
 /**
- * Main menu UI. Displays title, Host/Join/Offline buttons,
+ * Main menu UI. Displays title, map selection, Host/Join/Offline buttons,
  * display name input, Create-a-Class, Options, and Quit.
  */
 export class MainMenuUI {
@@ -101,6 +104,12 @@ export class MainMenuUI {
     private _nameInput: InputText;
     private _ipInput: InputText;
     private _errorText: TextBlock;
+
+    /** Currently selected map ID. */
+    private _selectedMapId: MapId;
+
+    /** Map of map ID → its selection button (for toggling highlight). */
+    private _mapButtons: Map<MapId, Button> = new Map();
 
     /**
      * Creates the main menu UI overlay.
@@ -116,6 +125,9 @@ export class MainMenuUI {
         onPlayOffline: () => void,
     ) {
         this._advancedTexture = createFullscreenUI("main_menu_ui", scene);
+
+        // Restore previously selected map or default
+        this._selectedMapId = (localStorage.getItem(SELECTED_MAP_KEY) ?? DEFAULT_MAP_ID) as MapId;
 
         /* Semi-transparent dark overlay */
         const overlay = new Rectangle("menu_overlay");
@@ -148,7 +160,7 @@ export class MainMenuUI {
         subtitle.fontSize = 16;
         subtitle.fontFamily = "Rajdhani, sans-serif";
         subtitle.height = "30px";
-        subtitle.paddingBottom = "30px";
+        subtitle.paddingBottom = "20px";
         this._mainPanel.addControl(subtitle);
 
         /* Display name label */
@@ -167,6 +179,73 @@ export class MainMenuUI {
             localStorage.setItem(DISPLAY_NAME_KEY, input.text);
         });
         this._mainPanel.addControl(this._nameInput);
+
+        // ─── Map Selection ─────────────────────────────────────────
+
+        /* Section label */
+        const mapLabel = new TextBlock("map_label", "Select Map");
+        mapLabel.color = "rgba(255,255,255,0.6)";
+        mapLabel.fontSize = 14;
+        mapLabel.fontFamily = "Rajdhani, sans-serif";
+        mapLabel.height = "22px";
+        this._mainPanel.addControl(mapLabel);
+
+        /* Grid of map selection buttons (one per map) */
+        const mapGrid = new Grid("map_grid");
+        mapGrid.width = BUTTON_WIDTH;
+        mapGrid.height = "50px";
+        mapGrid.paddingBottom = "16px";
+
+        const colCount = MAP_REGISTRY.length;
+        for (let i = 0; i < colCount; i++) {
+            mapGrid.addColumnDefinition(1 / colCount);
+        }
+        mapGrid.addRowDefinition(1);
+
+        MAP_REGISTRY.forEach((mapInfo, colIdx) => {
+            const isSelected = mapInfo.id === this._selectedMapId;
+            const btn = Button.CreateSimpleButton(`btn_map_${mapInfo.id}`, mapInfo.displayName.toUpperCase());
+            btn.color = "white";
+            btn.fontSize = 14;
+            btn.fontFamily = "Rajdhani, sans-serif";
+            btn.background = isSelected ? "rgba(100,200,255,0.25)" : "rgba(255,255,255,0.07)";
+            btn.thickness = isSelected ? 2 : 1;
+            btn.cornerRadius = 4;
+            btn.paddingLeft = colIdx === 0 ? "0px" : "4px";
+            btn.paddingRight = colIdx === colCount - 1 ? "0px" : "4px";
+
+            btn.onPointerEnterObservable.add(() => {
+                if (mapInfo.id !== this._selectedMapId) {
+                    btn.background = "rgba(255,255,255,0.15)";
+                }
+            });
+            btn.onPointerOutObservable.add(() => {
+                if (mapInfo.id !== this._selectedMapId) {
+                    btn.background = "rgba(255,255,255,0.07)";
+                }
+            });
+            btn.onPointerUpObservable.add(() => {
+                this._selectMap(mapInfo.id);
+            });
+
+            this._mapButtons.set(mapInfo.id, btn);
+            mapGrid.addControl(btn, 0, colIdx);
+        });
+
+        this._mainPanel.addControl(mapGrid);
+
+        /* Map description text (shows the description of the selected map) */
+        const mapDesc = this._getSelectedMapInfo()?.description ?? "";
+        const mapDescText = new TextBlock("map_desc", mapDesc);
+        mapDescText.color = "rgba(255,255,255,0.45)";
+        mapDescText.fontSize = 12;
+        mapDescText.fontFamily = "Rajdhani, sans-serif";
+        mapDescText.height = "20px";
+        mapDescText.paddingBottom = "14px";
+        this._mainPanel.addControl(mapDescText);
+
+        // Store reference so _selectMap() can update it
+        (this as any)._mapDescText = mapDescText;
 
         /* Error text (hidden by default) */
         this._errorText = new TextBlock("error_text", "");
@@ -274,6 +353,44 @@ export class MainMenuUI {
             () => this._showMainPanel(),
             { showBotSettings: true },
         );
+    }
+
+    /**
+     * Selects a map, updates button highlights, and persists the choice.
+     * @param mapId - The map to select.
+     */
+    private _selectMap(mapId: MapId): void {
+        const previous = this._selectedMapId;
+        this._selectedMapId = mapId;
+        localStorage.setItem(SELECTED_MAP_KEY, mapId);
+
+        // Update previous button to unselected style
+        const prevBtn = this._mapButtons.get(previous);
+        if (prevBtn) {
+            prevBtn.background = "rgba(255,255,255,0.07)";
+            prevBtn.thickness = 1;
+        }
+
+        // Update new button to selected style
+        const nextBtn = this._mapButtons.get(mapId);
+        if (nextBtn) {
+            nextBtn.background = "rgba(100,200,255,0.25)";
+            nextBtn.thickness = 2;
+        }
+
+        // Update description text
+        const descText = (this as any)._mapDescText as TextBlock | undefined;
+        if (descText) {
+            descText.text = this._getSelectedMapInfo()?.description ?? "";
+        }
+    }
+
+    /**
+     * Returns the MapInfo entry for the currently selected map.
+     * @returns MapInfo or undefined.
+     */
+    private _getSelectedMapInfo() {
+        return MAP_REGISTRY.find(m => m.id === this._selectedMapId);
     }
 
     /**
